@@ -1,0 +1,519 @@
+<html>
+<head>
+  <title>DCPU-16 emulator</title>
+  <script type="text/javascript" src="dcpu.js"></script>
+  <style>
+    body {
+      font-family: Verdana, Tahoma, sans-serif;
+    }
+    h3 {
+      font-size: 22px;
+    }
+    table td {
+      position: relative;
+    }
+    .editor, .editor td {
+      font-family: Monaco, Lucida Console, Andale Mono, Courier New, Courier, monospace;
+      font-size: 14px;
+      line-height: 19px;
+      margin: 0;
+    }
+    #linenums {
+      padding: 2px 0px 2px 0px;
+      text-align: right;
+      color: gray;
+    }
+    #linenums u {
+      margin: 1px 1px 2px 1px;
+      padding: 1px 11px;
+      line-height: 15px;
+      text-decoration: none;
+      display: block;
+      cursor: pointer;
+    }
+    #linenums u.breakpoint {
+      padding: 0px 10px;
+      background-color: #adf;
+      border: 1px solid #3ab;
+      border-radius: 3px;
+    }
+    #offsets {
+      padding: 4px 10px 2px 24px;
+      color: gray;
+    }
+    #code {
+      width: 100%;
+      min-width: 500px;
+      background-color: transparent;
+    }
+    #dump {
+      overflow-x: auto;
+      overflow-y: visible;
+      white-space: nowrap;
+      padding: 4px;
+      width: 300px;
+    }
+    #debugger button {
+      font-size: 20px;
+      width: 120px;
+      height: 40px;
+      text-align: left;
+      margin: 4px;
+    }
+    #log {
+      padding-top: 6px;
+    }
+    #log .line {
+      color: gray;
+    }
+    #log .fatal {
+      font-weight: bold;
+      color: #900;
+    }
+    #memory_wrapper {
+      position: relative;
+    }
+    #memory_window {
+      overflow-y: scroll;
+      width: 400px;
+      height: 304px;
+    }
+    #memory_stub {
+      height: 8480px;
+    }
+    #memory_view {
+      position: relative;
+      top: 0px;
+      left: 0px;
+    }
+    #memory_view span {
+      color: gray;
+    }
+    .reg_name {
+      padding-left: 20px;
+      font-weight: bold;
+      color: gray;
+    }
+    .cur_sp {
+      background-color: #aaaaff;
+      text-decoration: none;
+    }
+    .cur_pc {
+      background-color: #aaffaa;
+      text-decoration: none;
+    }
+    .line_highlight {
+      background-color: #aaffaa;
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 19px;
+      z-index: -1000;
+    }
+    .hlight_wrap {
+      position: relative;
+    }
+    #screen {
+      background-color: black;
+      color: white;
+      font-size: 15px;
+      width: 288px;
+      height: 228px;
+      line-height: 19px;
+      padding: 4px;
+    }
+    #screen u, #screen b {
+      display: inline-block;
+      width: 9px;
+      height: 19px;
+      text-decoration: none;
+      font-weight: normal;
+    }
+    #screen .f0 {color: #000000;}
+    #screen .f1 {color: #000080;}
+    #screen .f2 {color: #008000;}
+    #screen .f3 {color: #008080;}
+    #screen .f4 {color: #800000;}
+    #screen .f5 {color: #800080;}
+    #screen .f6 {color: #808000;}
+    #screen .f7 {color: #808080;}
+    #screen .f8 {color: #A0A0A0;}
+    #screen .f9 {color: #A0A0F0;}
+    #screen .fa {color: #A0F0A0;}
+    #screen .fb {color: #A0F0F0;}
+    #screen .fc {color: #F0A0A0;}
+    #screen .fd {color: #F0A0F0;}
+    #screen .fe {color: #F0F0A0;}
+    #screen .ff {color: #F0F0F0;}
+
+    #screen .b0 {background-color: #000000;}
+    #screen .b1 {background-color: #000080;}
+    #screen .b2 {background-color: #008000;}
+    #screen .b3 {background-color: #008080;}
+    #screen .b4 {background-color: #800000;}
+    #screen .b5 {background-color: #800080;}
+    #screen .b6 {background-color: #808000;}
+    #screen .b7 {background-color: #808080;}
+    #screen .b8 {background-color: #909090;}
+    #screen .b9 {background-color: #A0A0F0;}
+    #screen .ba {background-color: #A0F0A0;}
+    #screen .bb {background-color: #A0F0F0;}
+    #screen .bc {background-color: #F0A0A0;}
+    #screen .bd {background-color: #F0A0F0;}
+    #screen .be {background-color: #F0F0A0;}
+    #screen .bf {background-color: #F0F0F0;}
+
+    #screen .h {visibility: hidden;}
+  </style>
+</head>
+  <h3>DCPU-16 Assembler &amp; Emulator</h3>
+
+  <table width="100%" border=0 cellpadding=0 cellspacing=0><tr valign=top>
+  <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
+  <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" wrap=off>
+; Try some basic stuff
+              SET A, 0x30              ; 7c01 0030
+              SET [0x1000], 0x20       ; 7de1 1000 0020
+              SUB A, [0x1000]          ; 7803 1000
+              IFN A, 0x10              ; c00d
+                 SET PC, crash         ; 7dc1 001a [*]
+
+; Do a loopy thing
+              SET I, 10                ; a861
+              SET A, 0x2000            ; 7c01 2000
+:loop         SET [0x2000+I], [A]      ; 2161 2000
+              SUB I, 1                 ; 8463
+              IFN I, 0                 ; 806d
+                 SET PC, loop          ; 7dc1 000d [*]
+
+; Call a subroutine
+              SET X, 0x4               ; 9031
+              JSR testsub              ; 7c10 0018 [*]
+              SET PC, crash            ; 7dc1 001a [*]
+
+:testsub      SHL X, 4                 ; 9037
+              SET PC, POP              ; 61c1
+
+; Hang forever. X should now be 0x40 if everything went right.
+:crash        SET PC, crash            ; 7dc1 001a [*]
+
+; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
+;      but my assembler doesn't support short form labels yet.
+  </textarea></td>
+  <!--
+; Assembler test for DCPU
+; by Markus Persson
+
+:start
+  set i, 0
+  set j, 0
+  set b, 0xf100
+:nextchar
+  set a, [data+i]
+  ife a, 0
+    set PC, end
+  ifg a, 0xff
+    set PC, setcolor
+  bor a, b
+  set [0x8000+j], a
+  add i, 1
+  add j, 1
+  set PC, nextchar
+
+:setcolor
+  set b, a
+  and b, 0xff
+  shl b, 8
+  ifg a, 0x1ff
+    add b, 0x80
+  add i, 1
+  set PC, nextchar
+
+
+:data
+  dat 0x170, "Hello ", 0x2e1, "world", 0x170, ", how are you?"
+
+:end
+  set PC, start
+  -->
+  <td width="30"><div class="hlight_wrap"><div class="line_highlight" id="hlight3"></div></div><div class="editor" id="offsets"></div></td>
+  <td width="20%"><div class="hlight_wrap"><div class="line_highlight" id="hlight4"></div></div><div class="editor" id="dump"></td>
+  <td rowspan=2 width="20%" id="debugger" style="padding-left: 20px">
+    <span>Cycles: </span><span id="cycles">0</span><br/>
+    <button onclick="run(this)"/>&#8595; Run</button><button onclick="step()" />&#8618; Step</button><button onclick="reset()">&#8634; Reset</button><br/>
+    <label for="show_pc"><input type="checkbox" id="show_pc" name="show_pc" checked="checked" onchange="toggleShowPC()"/> Show current line</label>
+    <h4>Registers:</h4>
+    <table border=0 class="editor">
+    <tr>
+      <td class="reg_name">PC:</td><td id="regPC" class="cur_pc">0</td>
+      <td class="reg_name">SP:</td><td id="regSP" class="cur_sp">ffff</td>
+    </tr> <tr>
+      <td class="reg_name">A:</td><td id="regA">0</td>
+      <td class="reg_name">B:</td><td id="regB">0</td>
+      <td class="reg_name">C:</td><td id="regC">0</td>
+    </tr> <tr>
+      <td class="reg_name">X:</td><td id="regX">0</td>
+      <td class="reg_name">Y:</td><td id="regY">0</td>
+      <td class="reg_name">Z:</td><td id="regZ">0</td>
+    </tr> <tr>
+      <td class="reg_name">I:</td><td id="regI">0</td>
+      <td class="reg_name">J:</td><td id="regJ">0</td>
+    </tr> <tr>
+      <td class="reg_name">O:</td><td id="regO">0</td>
+    </tr>
+    </table>
+
+    <h4>Memory dump:</h4>
+    <div id="memory_wrapper">
+      <div id="memory_window" onscroll="updateMemoryView()">
+        <div id="memory_stub">
+        <div id="memory_view" class="editor"></div></div>
+      </div>
+    </div>
+
+    <h4>Screen:</h4>
+    <pre class="editor" id="screen"></pre>
+  </td>
+  </tr><tr valign=top>
+  <td colspan=3 class="editor" id="log"></td>
+  </tr></table>
+  <script language="javascript">
+    var cycles = 0;
+    var memory = [];
+    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, O: 0};
+    var memToLine = {};
+    var lineToMem = {};
+    var breaks = {};
+    function updateRegisters() {
+      for (var reg in registers) {
+        document.getElementById("reg" + reg).innerHTML = pad(registers[reg].toString(16), 4);
+      }
+      document.getElementById("cycles").innerHTML = cycles;
+    }
+    function toggleShowPC() {
+      updateHighlight();
+    }
+    updateRegisters();
+    function updateMemoryView() {
+      var s = "";
+      var offs = document.getElementById("memory_window").scrollTop * 8;
+      document.getElementById("memory_view").style.top = (offs / 8) + "px";
+      for (var i = 0; i < 16; i++) {
+        s += "<span>" + pad((offs + i * 8).toString(16), 4) + ":</span>";
+        for (var j = 0; j < 8; j++) {
+          var v = memory[offs + i * 8 + j];
+          if (!v) v = 0;
+          v = pad(v.toString(16), 4);
+          if (((offs + i * 8 + j + 1) & 0xffff) == registers.SP) {
+            s += " <u class='cur_sp'>" + v + "</u>";
+          } else
+          if (offs + i * 8 + j == registers.PC) {
+            s += " <u class='cur_pc'>" + v + "</u>";
+          } else {
+            s += " " + v;
+          }
+        }
+        s += "<br/>";
+      }
+      document.getElementById("memory_view").innerHTML = s;
+
+      s = "";
+      var idx = 0x8000;
+      for (var i = 0; i < 12; i++) {
+        for (var j = 0; j < 32; j++) {
+          var v = memory[idx];
+          if (v == 13) {
+            s += "<br/>";
+            idx++;
+            break;
+          } else {
+            var fc = (v >> 12) & 0xf;
+            var bc = (v >> 8) & 0xf;
+            var cd = (v & 0x7f);
+            var b = (v >> 7) & 1;
+            if (!v) v = 0x0;
+            if (fc == 0 && bc == 0) fc = 0xf;
+            s += "<u class='f" + fc.toString(16) + " b" + bc.toString(16) + "'>" + (b ? "<b" + (blink ? " class='h'" : "") + ">" : "") + ((cd > 0x20) ? String.fromCharCode(cd) : "&nbsp;") + (b ? "</b>" : "") + "</u>";
+            idx++;
+          }
+        }
+        s += "<br/>";
+      }
+      document.getElementById("screen").innerHTML = s;
+    }
+    updateMemoryView();
+    function positionHighlight(line) {
+      if (!document.getElementById("show_pc").checked) {
+        line = -1;
+      }
+      for (var i = 1; i <= 4; i++) {
+        var hlight = document.getElementById("hlight" + i);
+        if (line >= 0) {
+          hlight.style.top = line * 19 + 2;
+          hlight.style.display = "block";
+        } else {
+          hlight.style.display = "none";
+        }
+      }
+    }
+    function updateHighlight() {
+      positionHighlight(memToLine[registers.PC] - 1);
+    }
+    positionHighlight(-1);
+    function reset() {
+      for (var i = 0; i < 0xffff; i++) {
+        if (memory[i]) memory[i] = 0;
+      }
+      for (var reg in registers) {
+        registers[reg] = 0;
+      }
+      registers.SP = 0;
+      cycles = 0;
+      assemble();
+    }
+    var logger = function(offset, msg, fatal) {
+      //log.push(pad(line + 1, 5) + ": " + (fatal ? "(Fatal) " : "") + msg);
+      if (fatal) clearInterval(runningTimer);
+    };
+    function step() {
+      cycles += DCPU.step(memory, registers);
+      updateHighlight();
+      updateRegisters();
+      updateMemoryView();
+    }
+    var runningTimer = false;
+    function run(button) {
+      if (runningTimer) {
+        clearInterval(runningTimer);
+        runningTimer = false;
+        button.innerHTML = "&#8595; Run";
+        updateHighlight();
+        updateRegisters();
+        updateMemoryView();
+      } else {
+        runningTimer = setInterval(function() {
+          for (var i = 0; i < 2173; i++) {
+            cycles += DCPU.step(memory, registers);
+            if (!runningTimer) return;
+            if (breaks[memToLine[registers.PC] - 1]) {
+              run(button);
+              return;
+            }
+          }
+          updateHighlight();
+          updateRegisters();
+          updateMemoryView();
+        }, 50);
+        button.innerHTML = "&#215; Stop";
+      }
+    }
+    function bp(line) {
+      breaks[line] = !breaks[line] && (lineToMem[line] !== undefined);
+      document.getElementById("ln" + line).className = breaks[line] ? "breakpoint" : "";
+    }
+    function pad(v, w) {
+      var s = "" + v;
+      var len = s.length;
+      for (var i = 0; i < w - len; i++)
+        s = "0" + s;
+      return s;
+    }
+    function assemble() {
+      var lines = document.getElementById("code").value.split("\n");
+      var labels = {};
+      var linenums = [];
+      var offsets = [];
+      var dump = [];
+      var log = [];
+      var aborted = false;
+      var logger = function(line, offset, msg, fatal) {
+        log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
+        if (fatal) aborted = true;
+      };
+      // get values of labels
+      var sp = 0;
+      var last = false;
+      memToLine = {};
+      lineToMem = {};
+      for (var i = 0; i < lines.length && !aborted; i++) {
+        linenums.push("<u id=ln" + i + " onclick='bp(" + i + ")'>" + (i + 1) + "</u>");
+      }
+      for (var i = 0; i < 0xffff; i++) {
+        if (memory[i]) memory[i] = 0;
+      }
+      for (var i = 0; i < lines.length && !aborted; i++) {
+        var info = DCPU.compileLine(i, sp, lines[i], false, logger);
+        if (aborted) break;
+        if (info.label) {
+          if (DCPU.reserved.indexOf(info.label.toUpperCase()) >= 0) {
+            logger(i, sp, "\"" + info.label + "\" is reserved keyword, you can't use it as label name", true);
+            break;
+          } else
+          if (labels[info.label]) {
+            logger(i, sp, "Duplicate label \"" + info.label + "\"");
+          }
+          labels[info.label] = sp;
+        }
+        if (sp + info.max_size > 0xFFFF) {
+          logger(i, sp, "Code is too big (exceeds 128 Kb), not enough memory", true);
+          break;
+        } else
+        if (sp + info.max_size > 0x8000) {
+          logger(i, sp, "Code is too big (exceeds 64 Kb), overlaps videomemory - there will be glitches on screen)");
+        }
+        if (info.max_size > 0) {
+          lineToMem[i] = sp;
+          offsets.push(pad(sp.toString(16), 4) + ":");
+        } else {
+          offsets.push("");
+        }
+        sp += info.max_size;
+      }
+      sp = 0;
+      for (var i = 0; i < lines.length && !aborted; i++) {
+        var info = DCPU.compileLine(i, sp, lines[i], labels, logger);
+        if (aborted) break;
+        var s = "";
+        for (var j = 0; j < info.dump.length; j++) {
+          s += pad(info.dump[j].toString(16), 4) + " ";
+          memory[sp + j] = info.dump[j];
+          memToLine[sp + j] = i + 1;
+        }
+        dump.push(s);
+        sp += info.max_size;
+        if (info.op) last = info;
+      }
+      if (aborted) {
+        offsets = [];
+        dump = [];
+      }
+
+      // update UI
+      document.getElementById("linenums").innerHTML = linenums.join("");
+      document.getElementById("offsets").innerHTML = offsets.join("<br/>");
+      document.getElementById("dump").innerHTML = dump.join("<br/>");
+      document.getElementById("log").innerHTML = log.join("<br/>");
+      document.getElementById("code").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
+
+      for (var line in breaks) {
+        if (breaks[line] && (lineToMem[line] === undefined)) {
+          bp(line);
+        } else
+          document.getElementById("ln" + line).className = breaks[line] ? "breakpoint" : "";
+      }
+      updateMemoryView();
+      updateHighlight();
+      updateRegisters();
+    }
+    assemble();
+    var blink = false;
+    setInterval(function() {
+      blink = !blink;
+      var els = document.getElementById("screen").getElementsByTagName("b");
+      for (var i in els) {
+        els[i].className = blink ? "h" : "";
+      }
+    }, 600);
+  </script>
+</html>
