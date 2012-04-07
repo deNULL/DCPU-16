@@ -171,7 +171,7 @@
 
   <table width="100%" border=0 cellpadding=0 cellspacing=0><tr valign=top>
   <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
-  <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" wrap=off>
+  <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off>
 ; Try some basic stuff
               SET A, 0x30              ; 7c01 0030
               SET [0x1000], 0x20       ; 7de1 1000 0020
@@ -420,7 +420,8 @@
       return s;
     }
     function assemble() {
-      var lines = document.getElementById("code").value.split("\n");
+      lastCode = document.getElementById("code").value;
+      var lines = lastCode.split("\n");
       var labels = {};
       var linenums = [];
       var offsets = [];
@@ -508,11 +509,18 @@
     }
     assemble();
     var blink = false;
+    var lastCode = document.getElementById("code").value;
     setInterval(function() {
       blink = !blink;
       var els = document.getElementById("screen").getElementsByTagName("b");
       for (var i in els) {
         els[i].className = blink ? "h" : "";
+      }
+
+      var code = document.getElementById("code").value;
+      if (code != lastCode) {
+        lastCode = code;
+        assemble();
       }
     }, 600);
   </script>
