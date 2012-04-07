@@ -55,7 +55,7 @@
     }
     #debugger button {
       font-size: 20px;
-      width: 120px;
+      width: 160px;
       height: 40px;
       text-align: left;
       margin: 4px;
@@ -167,6 +167,7 @@
     #screen .h {visibility: hidden;}
   </style>
 </head>
+<body onkeydown="keydown(event)">
   <h3>DCPU-16 Assembler &amp; Emulator</h3>
 
   <table width="100%" border=0 cellpadding=0 cellspacing=0><tr valign=top>
@@ -241,7 +242,7 @@
   <td width="20%"><div class="hlight_wrap"><div class="line_highlight" id="hlight4"></div></div><div class="editor" id="dump"></td>
   <td rowspan=2 width="20%" id="debugger" style="padding-left: 20px">
     <span>Cycles: </span><span id="cycles">0</span><br/>
-    <button onclick="run(this)"/>&#8595; Run</button><button onclick="step()" />&#8618; Step</button><button onclick="reset()">&#8634; Reset</button><br/>
+    <button onclick="run(this)" id="button_run"/>&#8595; Run (F5)</button><button onclick="step()" />&#8618; Step (F6)</button><button onclick="reset()">&#8634; Reset</button><br/>
     <label for="show_pc"><input type="checkbox" id="show_pc" name="show_pc" checked="checked" onchange="toggleShowPC()"/> Show current line</label>
     <h4>Registers:</h4>
     <table border=0 class="editor">
@@ -285,6 +286,20 @@
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
+    function keydown(event) {
+      var e = event || window.event;
+      switch (e.keyCode) {
+        case 116: { // F5
+          run(document.getElementById("button_run"));
+          return false;
+        }
+        case 117: { // F6
+          step();
+          return false;
+        }
+      }
+      return true;
+    }
     function updateRegisters() {
       for (var reg in registers) {
         document.getElementById("reg" + reg).innerHTML = pad(registers[reg].toString(16), 4);
@@ -387,7 +402,7 @@
       if (runningTimer) {
         clearInterval(runningTimer);
         runningTimer = false;
-        button.innerHTML = "&#8595; Run";
+        button.innerHTML = "&#8595; Run (F5)";
         updateHighlight();
         updateRegisters();
         updateMemoryView();
@@ -405,7 +420,7 @@
           updateRegisters();
           updateMemoryView();
         }, 50);
-        button.innerHTML = "&#215; Stop";
+        button.innerHTML = "&#215; Stop (F5)";
       }
     }
     function bp(line) {
@@ -524,4 +539,5 @@
       }
     }, 600);
   </script>
+</body>
 </html>
