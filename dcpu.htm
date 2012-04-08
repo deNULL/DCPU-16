@@ -165,9 +165,15 @@
     #screen .bf {background-color: #F0F0F0;}
 
     #screen .h {visibility: hidden;}
+
+    .notice {
+      margin: 8px 0px;
+      color: gray;
+      font-size: 14px;
+    }
   </style>
 </head>
-<body onkeydown="keydown(event)">
+<body>
   <h3>DCPU-16 Assembler &amp; Emulator</h3>
 
   <table width="100%" border=0 cellpadding=0 cellspacing=0><tr valign=top>
@@ -275,6 +281,7 @@
 
     <h4>Screen:</h4>
     <pre class="editor" id="screen"></pre>
+    <div class="notice">Keyboard input is available while the program is running.</div>
   </td>
   </tr><tr valign=top>
   <td colspan=3 class="editor" id="log"></td>
@@ -286,15 +293,35 @@
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
-    function keydown(event) {
+    // Not final yet! Will most probably change after clarifications from Notch
+    var keymap = {0x0d: 0x0a, 0x25: 0x01, 0x27: 0x02, 0x26: 0x03, 0x28: 0x04};
+    document.onkeydown = function(event) {
       var e = event || window.event;
-      switch (e.keyCode) {
+      var key = e.keyCode;
+      if (keymap[key]) key = keymap[key];
+      switch (key) {
         case 116: { // F5
           run(document.getElementById("button_run"));
           return false;
         }
         case 117: { // F6
           step();
+          return false;
+        }
+        default: { // pass it to program
+          if (!runningTimer) {
+            return true;
+          }
+          var placed = false;
+          for (var i = 0x9000; i < 0x900f; i++) {
+            if (placed) {
+              memory[i] = 0;
+            } else
+            if (memory[i] == 0) {
+              memory[i] = key;
+              placed = true;
+            }
+          }
           return false;
         }
       }
