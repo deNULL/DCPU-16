@@ -8,6 +8,7 @@
     }
     h3 {
       font-size: 22px;
+      margin-bottom: 0px;
     }
     table td {
       position: relative;
@@ -167,16 +168,20 @@
     #screen .h {visibility: hidden;}
 
     .notice {
-      margin: 8px 0px;
+      margin: 6px 0px 10px 0px;
       color: gray;
       font-size: 14px;
+    }
+    .notice a {
+      color: black;
     }
   </style>
 </head>
 <body>
   <h3>DCPU-16 Assembler &amp; Emulator</h3>
+  <div class="notice">by deNULL. Report any problems at <a href="mailto:me@denull.ru">me@denull.ru</a>.</div>
 
-  <table width="100%" border=0 cellpadding=0 cellspacing=0><tr valign=top>
+  <table width="100%" border=0 cellpadding=0 cellspacing=0 style="padding-top: 6px"><tr valign=top>
   <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
   <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off>
 ; Try some basic stuff
@@ -284,7 +289,9 @@
     <div class="notice">Keyboard input is available while the program is running.</div>
   </td>
   </tr><tr valign=top>
-  <td colspan=3 class="editor" id="log"></td>
+  <td colspan=3>
+  <div class="notice">Click on the line numbers to toggle breakpoints.</div>
+  <div id="log" class="editor"></div></td>
   </tr></table>
   <script language="javascript">
     var cycles = 0;
