@@ -333,7 +333,7 @@ decodeValue: function(index, offset, val, labels, logger) {
     }
   }
   var intval = -1;
-  var can_be_label = !labels && val.match(/^[a-zA-Z_][a-zA-Z_0-9]+$/);
+  var can_be_label = !labels && val.match(/^[a-zA-Z_.][a-zA-Z_.0-9]+$/);
   var is_label = false;
   if (val.match(/^[0-9]{1,5}$/g)) {
     intval = parseInt(val, 10);
@@ -394,9 +394,9 @@ compileLine: function(index, offset, line, labels, logger) {
         logger(index, offset, "Label name must not be empty");
       info.label = false;
     } else
-    if (!info.label.match(/^[a-z_][a-z_0-9]+$/)) {
+    if (!info.label.match(/^[a-z_.][a-z_.0-9]+$/)) {
       if (labels)
-        logger(index, offset, "Label name must contain only latin characters, underscore or digits. Ignoring \"" + info.label + "\"");
+        logger(index, offset, "Label name must contain only latin characters, underscore, dot or digits. Ignoring \"" + info.label + "\"");
       info.label = false;
     }
   }
