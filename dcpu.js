@@ -380,7 +380,19 @@ decodeValue: function(index, offset, val, labels, logger) {
 */
 compileLine: function(index, offset, line, labels, logger) {
   var info = {max_size: 0, size: 0, dump: []};
-  if (line.indexOf(";") >= 0) line = line.substr(0, line.indexOf(";")); // trim comments
+  var in_string = false;
+  for (var i = 0; i < line.length; i++) {
+    if (in_string && line.charAt(i) == '\\' && i < line.length - 1) {
+      i++;
+    } else
+    if (line.charAt(i) == '"') {
+      in_string = !in_string;
+    } else
+    if (line.charAt(i) == ';' && !in_string) {
+      line = line.substr(0, i);
+      break;
+    }
+  }
   line = line.replace(/\s/g, " ").trim();
   if (line.length == 0) return info;
   if (line.charAt(0) == ":") {
@@ -407,7 +419,7 @@ compileLine: function(index, offset, line, labels, logger) {
   line = line.substr(op_end).trim();
   //var vals = line.split(/\s*,\s*/g);
   var vals = [""];
-  var in_string = false;
+  in_string = false;
   for (var i = 0; i < line.length; i++) {
     if (line.charAt(i) == '\\' && i < line.length - 1) {
       i++;
