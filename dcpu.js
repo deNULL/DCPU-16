@@ -17,6 +17,9 @@ Array.prototype.indexOf = function(v) {
       return i;
   return -1;
 }
+function wrapAs(s, c) {
+  return "<span class='" + c + "'>" + s + "</span>";
+}
 var DCPU = {
 bops: ["SET", "ADD", "SUB", "MUL", "DIV", "MOD", "SHL", "SHR", "AND", "BOR", "XOR", "IFE", "IFN", "IFG", "IFB"],
 cond: ["IFE", "IFN", "IFG", "IFB"],
@@ -671,6 +674,117 @@ compileLine: function(index, offset, line, labels, logger) {
   }
 
   return info;
+},
+
+disassembleValue: function(code, memory, offset, logger) {
+
+  if (code < 0x8) {
+    return {size: 0, str: wrapAs(DCPU.regs[code], "reg")};
+  } else
+  if (code < 0x10) {
+    return {size: 0, str: "[" + wrapAs(DCPU.regs[code - 0x08], "reg") + "]"};
+  } else
+  if (code < 0x18) {
+    if (offset >= memory.length) {
+      logger(offset, "Disassembler reached end of the file", true);
+      return false;
+    }
+    var nw = memory[offset];
+    return {size: 1, str: "[" + wrapAs(DCPU.regs[code - 0x10], "reg") + "+" + wrapAs("0x" + nw.toString(16), "lit") + "]"};
+  } else
+  if (code == 0x18) { // POP
+    return {size: 0, str: wrapAs("POP", "kw")};
+  } else
+  if (code == 0x19) { // PEEK
+    return {size: 0, str: wrapAs("PEEK", "kw")};
+  } else
+  if (code == 0x1a) { // PUSH
+    return {size: 0, str: wrapAs("PUSH", "kw")};
+  } else
+  if (code == 0x1b) {
+    return {size: 0, str: wrapAs("SP", "kw")};
+  } else
+  if (code == 0x1c) {
+    return {size: 0, str: wrapAs("PC", "kw")};
+  } else
+  if (code == 0x1d) {
+    return {size: 0, str: wrapAs("O", "kw")};
+  } else
+  if (code == 0x1e) {
+    if (offset >= memory.length) {
+      logger(offset, "Disassembler reached end of the file", true);
+      return false;
+    }
+    var nw = memory[offset];
+    return {size: 1, str: "[" + wrapAs("0x" + pad(nw.toString(16), 4), "lit") + "]"};
+  } else
+  if (code == 0x1f) {
+    if (offset >= memory.length) {
+      logger(offset, "Disassembler reached end of the file");
+      return false;
+    }
+    var nw = memory[offset];
+    return {size: 1, str: wrapAs("0x" + pad(nw.toString(16), 4), "lit"), literal: nw};
+  } else {
+    return {size: 0, str: wrapAs((code - 0x20).toString(10), "lit"), literal: (code - 0x20)};
+  }
+},
+/*
+* Disassembles code in memory at specified offset
+*
+* Returns object with fields
+* - code
+* - branch
+* - terminal
+* - size
+*/
+disassemble: function(memory, offset, logger) {
+  var res = {size: 1};
+  if (offset >= memory.length) {
+    logger(offset, "Disassembler reached end of the file");
+    return {size: 0, terminal: true};
+  }
+  var cur = memory[offset];
+  var op = cur & 0xf;
+  var aa = (cur >> 4) & 0x3f;
+  var bb = (cur >> 10) & 0x3f;
+
+  switch (op) {
+    case 0x0: {
+      switch (aa) {
+        case 0x1: { // JSR
+          var vb = DCPU.disassembleValue(bb, memory, offset + res.size, logger);
+          res.code = wrapAs("JSR", "op") + " " + vb.str;
+          if (vb.literal !== undefined) {
+            res.branch = vb.literal;
+          }
+          return res;
+        }
+        default: {
+          logger(offset, "Unknown instruction: " + aa.toString(16));
+          return {size: 0, terminal: true};
+        }
+      }
+    }
+    default: {
+      var va = DCPU.disassembleValue(aa, memory, offset + res.size, logger);
+      res.size += va.size;
+      var vb = DCPU.disassembleValue(bb, memory, offset + res.size, logger);
+      res.size += vb.size;
+
+      res.code = wrapAs(DCPU.bops[op - 1], "op") + " " + va.str + ", " + vb.str;
+      if (op == 0x01 && aa == 0x1c) {
+        res.terminal = true;
+        if (vb.literal !== undefined) {
+          res.branch = vb.literal;
+        }
+      } else
+      if (op >= 0x0c && op <= 0x0f) {
+        res.conditional = true;
+      }
+      return res;
+    }
+  }
 }
 
 

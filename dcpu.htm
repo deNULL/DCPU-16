@@ -42,10 +42,18 @@
       padding: 4px 10px 2px 24px;
       color: gray;
     }
+    #da_lines {
+      padding: 4px 10px 2px 24px;
+      color: gray;
+    }
     #code {
       width: 100%;
       min-width: 500px;
       background-color: transparent;
+    }
+    #da_input {
+      width: 100%;
+      min-width: 200px;
     }
     #dump {
       overflow-x: auto;
@@ -53,6 +61,9 @@
       white-space: nowrap;
       padding: 4px;
       width: 300px;
+    }
+    #da_code {
+      padding: 4px;
     }
     #debugger button {
       font-size: 20px;
@@ -84,10 +95,16 @@
     }
     #memory_view {
       position: relative;
+      float: left;
+      top: 0px;
+      left:0px;
+    }
+    #memory_lines {
+      position: relative;
+      float: left;
       top: 0px;
       left: 0px;
-    }
-    #memory_view span {
+      padding-right: 6px;
       color: gray;
     }
     .reg_name {
@@ -175,82 +192,134 @@
     .notice a {
       color: black;
     }
+    #tab1_wrapper {
+      display: none;
+    }
+    #da_code .op {
+      font-weight: bold;
+      color: #700;
+    }
+    #da_code .reg {
+      font-weight: bold;
+      color: #070;
+    }
+    #da_code .lit {
+      color: #007;
+    }
+    #da_code .kw {
+      color: #077;
+    }
+    .tabs {
+      margin-bottom: 2px;
+    }
+    .tab_active {
+      background-color: #8AE;
+      color: white;
+      padding: 2px 7px;
+      text-decoration: none;
+      border-radius: 4px 4px 0px 0px;
+      margin: 0px 5px;
+    }
+    .tab_inactive {
+      background-color: #FFF;
+      color: #57C;
+      padding: 2px 7px;
+      text-decoration: none;
+      border-radius: 4px 4px 0px 0px;
+      margin: 0px 5px;
+    }
   </style>
 </head>
 <body>
-  <h3>DCPU-16 Assembler &amp; Emulator</h3>
+  <h3>DCPU-16 Assembler, Emulator &amp; Disassembler</h3>
   <div class="notice">by deNULL. Report any problems at <a href="mailto:me@denull.ru">me@denull.ru</a>.</div>
 
   <table width="100%" border=0 cellpadding=0 cellspacing=0 style="padding-top: 6px"><tr valign=top>
-  <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
-  <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off>
-; Try some basic stuff
-              SET A, 0x30              ; 7c01 0030
-              SET [0x1000], 0x20       ; 7de1 1000 0020
-              SUB A, [0x1000]          ; 7803 1000
-              IFN A, 0x10              ; c00d
-                 SET PC, crash         ; 7dc1 001a [*]
+  <td width="80%">
+    <div class="tabs"><a href="javascript:" onclick="toggleTab(0)" class="tab_active" id="tab0">Assembler</a><a href="javascript:" onclick="toggleTab(1)" class="tab_inactive" id="tab1">Disassembler</a></div>
+    <div id="tab0_wrapper">
+    <table width="100%" id="assembler" cellpadding=0 cellspacing=0><tr valign=top>
+      <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
+      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off>
+    ; Try some basic stuff
+                  SET A, 0x30              ; 7c01 0030
+                  SET [0x1000], 0x20       ; 7de1 1000 0020
+                  SUB A, [0x1000]          ; 7803 1000
+                  IFN A, 0x10              ; c00d
+                     SET PC, crash         ; 7dc1 001a [*]
 
-; Do a loopy thing
-              SET I, 10                ; a861
-              SET A, 0x2000            ; 7c01 2000
-:loop         SET [0x2000+I], [A]      ; 2161 2000
-              SUB I, 1                 ; 8463
-              IFN I, 0                 ; 806d
-                 SET PC, loop          ; 7dc1 000d [*]
+    ; Do a loopy thing
+                  SET I, 10                ; a861
+                  SET A, 0x2000            ; 7c01 2000
+    :loop         SET [0x2000+I], [A]      ; 2161 2000
+                  SUB I, 1                 ; 8463
+                  IFN I, 0                 ; 806d
+                     SET PC, loop          ; 7dc1 000d [*]
 
-; Call a subroutine
-              SET X, 0x4               ; 9031
-              JSR testsub              ; 7c10 0018 [*]
-              SET PC, crash            ; 7dc1 001a [*]
+    ; Call a subroutine
+                  SET X, 0x4               ; 9031
+                  JSR testsub              ; 7c10 0018 [*]
+                  SET PC, crash            ; 7dc1 001a [*]
 
-:testsub      SHL X, 4                 ; 9037
-              SET PC, POP              ; 61c1
+    :testsub      SHL X, 4                 ; 9037
+                  SET PC, POP              ; 61c1
 
-; Hang forever. X should now be 0x40 if everything went right.
-:crash        SET PC, crash            ; 7dc1 001a [*]
+    ; Hang forever. X should now be 0x40 if everything went right.
+    :crash        SET PC, crash            ; 7dc1 001a [*]
 
-; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
-;      but my assembler doesn't support short form labels yet.
-  </textarea></td>
-  <!--
-; Assembler test for DCPU
-; by Markus Persson
+    ; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
+    ;      but my assembler doesn't support short form labels yet.
+      </textarea></td>
+      <!--
+    ; Assembler test for DCPU
+    ; by Markus Persson
 
-:start
-  set i, 0
-  set j, 0
-  set b, 0xf100
-:nextchar
-  set a, [data+i]
-  ife a, 0
-    set PC, end
-  ifg a, 0xff
-    set PC, setcolor
-  bor a, b
-  set [0x8000+j], a
-  add i, 1
-  add j, 1
-  set PC, nextchar
+    :start
+      set i, 0
+      set j, 0
+      set b, 0xf100
+    :nextchar
+      set a, [data+i]
+      ife a, 0
+        set PC, end
+      ifg a, 0xff
+        set PC, setcolor
+      bor a, b
+      set [0x8000+j], a
+      add i, 1
+      add j, 1
+      set PC, nextchar
 
-:setcolor
-  set b, a
-  and b, 0xff
-  shl b, 8
-  ifg a, 0x1ff
-    add b, 0x80
-  add i, 1
-  set PC, nextchar
+    :setcolor
+      set b, a
+      and b, 0xff
+      shl b, 8
+      ifg a, 0x1ff
+        add b, 0x80
+      add i, 1
+      set PC, nextchar
 
 
-:data
-  dat 0x170, "Hello ", 0x2e1, "world", 0x170, ", how are you?"
+    :data
+      dat 0x170, "Hello ", 0x2e1, "world", 0x170, ", how are you?"
 
-:end
-  set PC, start
-  -->
-  <td width="30"><div class="hlight_wrap"><div class="line_highlight" id="hlight3"></div></div><div class="editor" id="offsets"></div></td>
-  <td width="20%"><div class="hlight_wrap"><div class="line_highlight" id="hlight4"></div></div><div class="editor" id="dump"></td>
+    :end
+      set PC, start
+      -->
+      <td width="30"><div class="hlight_wrap"><div class="line_highlight" id="hlight3"></div></div><div class="editor" id="offsets"></div></td>
+      <td width="40%"><div class="hlight_wrap"><div class="line_highlight" id="hlight4"></div></div><div class="editor" id="dump"></div></td>
+    </tr></table>
+    <div class="notice">Click on the line numbers to toggle breakpoints.</div>
+    </div>
+    <div id="tab1_wrapper">
+    <table width="100%" id="disassembler" cellpadding=0 cellspacing=0><tr valign=top>
+      <td width="40%"><textarea class="editor" id="da_input" onkeyup="disassemble()" onchange="disassemble()" wrap=off>
+      </textarea></td>
+      <td width="30"><div class="editor" id="da_lines"></div></td>
+      <td width="60%"><div class="editor" id="da_code"></div></td>
+    </tr></table>
+    </div>
+  </td>
   <td rowspan=2 width="20%" id="debugger" style="padding-left: 20px">
     <span>Cycles: </span><span id="cycles">0</span><br/>
     <button onclick="run(this)" id="button_run"/>&#8595; Run (F5)</button><button onclick="step()" />&#8618; Step (F6)</button><button onclick="reset()">&#8634; Reset</button><br/>
@@ -280,6 +349,7 @@
     <div id="memory_wrapper">
       <div id="memory_window" onscroll="updateMemoryView()">
         <div id="memory_stub">
+        <div id="memory_lines" class="editor"></div>
         <div id="memory_view" class="editor"></div></div>
       </div>
     </div>
@@ -290,7 +360,6 @@
   </td>
   </tr><tr valign=top>
   <td colspan=3>
-  <div class="notice">Click on the line numbers to toggle breakpoints.</div>
   <div id="log" class="editor"></div></td>
   </tr></table>
   <script language="javascript">
@@ -334,6 +403,12 @@
       }
       return true;
     }
+    function toggleTab(index) {
+      for (var i = 0; i < 2; i++) {
+        document.getElementById("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
+        document.getElementById("tab" + i).className = (index == i) ? "tab_active" : "tab_inactive";
+      }
+    }
     function updateRegisters() {
       for (var reg in registers) {
         document.getElementById("reg" + reg).innerHTML = pad(registers[reg].toString(16), 4);
@@ -345,11 +420,13 @@
     }
     updateRegisters();
     function updateMemoryView() {
+      var lns = "";
       var s = "";
       var offs = document.getElementById("memory_window").scrollTop * 8;
+      document.getElementById("memory_lines").style.top = (offs / 8) + "px";
       document.getElementById("memory_view").style.top = (offs / 8) + "px";
       for (var i = 0; i < 16; i++) {
-        s += "<span>" + pad((offs + i * 8).toString(16), 4) + ":</span>";
+        lns += pad((offs + i * 8).toString(16), 4) + ":<br/>";
         for (var j = 0; j < 8; j++) {
           var v = memory[offs + i * 8 + j];
           if (!v) v = 0;
@@ -365,6 +442,7 @@
         }
         s += "<br/>";
       }
+      document.getElementById("memory_lines").innerHTML = lns;
       document.getElementById("memory_view").innerHTML = s;
 
       s = "";
@@ -557,8 +635,88 @@
       updateRegisters();
     }
     assemble();
+    function disassemble() {
+      lastInput = document.getElementById("da_input").value;
+      var input = lastInput + " ";
+      var linenum = lastInput.split("\n").length;
+      var data = [];
+      var s = "";
+      for (var i = 0; i < input.length; i++) {
+        if ("0123456789abcdefABCDEF".indexOf(input.charAt(i)) > -1) {
+          s += input.charAt(i);
+          if (s.length == 4) {
+            data.push(parseInt(s, 16));
+            s = "";
+          }
+        }
+      }
+
+      var log = [];
+      var aborted = false;
+      var logger = function(offset, msg, fatal) {
+        log.push("<span class='line'>" + pad(offset, 4) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
+        if (fatal) aborted = true;
+      };
+
+      var used = {};
+      var code = {};
+      var stack = [];
+      var conditional = false;
+      stack.push(0);
+      while (stack.length > 0) {
+        var pc = stack.pop();
+        if (used[pc]) {
+          continue;
+        }
+        do {
+          var info = DCPU.disassemble(data, pc, logger);
+          if (info.branch !== undefined) {
+            stack.push(info.branch);
+          }
+          for (var i = pc; i < pc + info.size; i++) {
+            used[i] = true;
+          }
+          if (info.code !== undefined) {
+            code[pc] = (conditional ? "&nbsp;&nbsp;" : "") + info.code;
+          }
+          pc += info.size;
+          if (conditional) {
+            info.terminal = false;
+          }
+          conditional = info.conditional;
+        } while (pc < data.length && !info.terminal);
+      }
+
+      var lines = [];
+      var output = [];
+      for (var i = 0; i < data.length; i++) {
+        if (code[i] !== undefined) {
+          lines.push(pad(i.toString(16), 4) + ":");
+          output.push(code[i]);
+        } else
+        if (!used[i]) {
+          var line = wrapAs("DAT", "op");
+          var words = [];
+          lines.push(pad(i.toString(16), 4) + ":");
+          while (i < data.length && !used[i]) {
+            words.push(wrapAs("0x" + pad(data[i].toString(16), 4), "lit"));
+            i++;
+          }
+          i--;
+          output.push(line + " " + words.join(", "));
+        }
+      }
+
+      // update UI
+      document.getElementById("da_lines").innerHTML = lines.join("<br/>");
+      document.getElementById("da_code").innerHTML = output.join("<br/>");
+      document.getElementById("log").innerHTML = log.join("<br/>");
+      document.getElementById("da_input").style.height = Math.max(560, ((linenum + 1) * 19 + 9)) + "px";
+    }
+    disassemble();
     var blink = false;
     var lastCode = document.getElementById("code").value;
+    var lastInput = document.getElementById("da_input").value;
     setInterval(function() {
       blink = !blink;
       var els = document.getElementById("screen").getElementsByTagName("b");
@@ -570,6 +728,11 @@
       if (code != lastCode) {
         lastCode = code;
         assemble();
+      }
+      var input = document.getElementById("code").value;
+      if (input != lastInput) {
+        lastInput = input;
+        //disassemble();
       }
     }, 600);
   </script>
