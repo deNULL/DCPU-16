@@ -348,7 +348,7 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
           value.label = operand.toLowerCase();
           value.literal = labels[value.label];
         } else {
-          logger(index, offset, "Invalid value: " + operand);
+          logger(index, offset, "Invalid value: " + operand, true);
           return false;
         }
       } else
@@ -356,7 +356,7 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
         value.label = operand.toLowerCase();
         value.incomplete = true;
       } else {
-        logger(index, offset, "Invalid value: " + operand);
+        logger(index, offset, "Invalid value: " + operand, true);
         return false;
       }
     }
