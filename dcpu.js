@@ -344,7 +344,7 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
         value.register = DCPU.regs.indexOf(operand.toUpperCase());
       } else
       if (labels) {
-        if (labels[operand.toLowerCase()]) {
+        if (labels[operand.toLowerCase()] !== undefined) {
           value.label = operand.toLowerCase();
           value.literal = labels[value.label];
         } else {
