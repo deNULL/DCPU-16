@@ -562,7 +562,7 @@ compileLine: function(index, offset, line, labels, logger) {
         logger(index, offset, "Label name must not be empty");
       info.label = false;
     } else
-    if (!info.label.match(/^[a-z_.][a-z_.0-9]+$/)) {
+    if (!info.label.match(/^[a-z_.][a-z_.0-9]*$/)) {
       if (labels)
         logger(index, offset, "Label name must contain only latin characters, underscore, dot or digits. Ignoring \"" + info.label + "\"");
       info.label = false;
