@@ -346,6 +346,10 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
       if (DCPU.regs.indexOf(operand.toUpperCase()) > -1) {
         value.register = DCPU.regs.indexOf(operand.toUpperCase());
       } else
+      if (DCPU.add_vals.indexOf(operand.toUpperCase()) > -1) {
+        logger(index, offset, "You can not use " + operand + " in expressions", true);
+        return false;
+      } else
       if (labels) {
         if (labels[operand.toLowerCase()] !== undefined) {
           value.label = operand.toLowerCase();
@@ -355,7 +359,7 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
           return false;
         }
       } else
-      if (operand.match(/^[a-zA-Z_.][a-zA-Z_.0-9]+$/)) {
+      if (operand.match(/^[a-zA-Z_.][a-zA-Z_.0-9]*$/)) {
         value.label = operand.toLowerCase();
         value.incomplete = true;
       } else {
