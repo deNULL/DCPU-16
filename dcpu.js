@@ -785,15 +785,30 @@ disassemble: function(memory, offset, logger) {
       res.size += vb.size;
 
       res.code = wrapAs(DCPU.bops[op - 1], "op") + " " + va.str + ", " + vb.str;
-      if (op == 0x01 && aa == 0x1c) {
-        res.terminal = true;
-        if (vb.literal !== undefined) {
-          res.branch = vb.literal;
-        }
-      } else
       if (op >= 0x0c && op <= 0x0f) {
         res.conditional = true;
+      } else
+      if (aa == 0x1c) {
+        offset += res.size;
+        res.terminal = true;
+        if (vb.literal === undefined) {
+          logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
+        } else
+        switch (op) {
+          case 0x1: { res.branch = vb.literal; break; }
+          case 0x2: { res.branch = (offset + vb.literal) & 0xffff; break; }
+          case 0x3: { res.branch = (offset - vb.literal) & 0xffff; break; }
+          case 0x4: { res.branch = (offset * vb.literal) & 0xffff; break; }
+          case 0x5: { res.branch = parseInt(offset / vb.literal) & 0xffff; break; }
+          case 0x6: { res.branch = (vb.literal == 0) ? 0 : (offset % vb.literal); break; }
+          case 0x7: { res.branch = (offset << vb.literal) & 0xffff; break; }
+          case 0x8: { res.branch = (offset >> vb.literal) & 0xffff; break; }
+          case 0x9: { res.branch = (offset & vb.literal); break; }
+          case 0xa: { res.branch = (offset | vb.literal); break; }
+          case 0xb: { res.branch = (offset ^ vb.literal); break; }
+        }
       }
+
       return res;
     }
   }
