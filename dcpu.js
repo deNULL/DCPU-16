@@ -266,6 +266,165 @@ step: function(memory, registers) {
     }
   }
 },
+
+/*
+* Parse given expression containing GP registers, literals, labels, operations +, -, * and parentheses
+*
+* Returns object with fields:
+* literal: int word
+or
+* register: int index
+or
+* operation: string (+/-/*) + operands: array
+or
+* label: string
+* end: int
+*/
+parseExpression: function(index, offset, expr, pos, labels, logger) {
+  var res = false;
+  while (pos < expr.length) {
+    var operation = false;
+    // read binary operation
+    if (res) {
+      while (pos < expr.length && expr.charAt(pos) == ' ') pos++;
+      if (pos >= expr.length) break;
+
+      if (expr.charAt(pos) == ')') {
+        res.end = pos + 1;
+        return res;
+      } else
+      if (expr.charAt(pos) == '+' || expr.charAt(pos) == '-' || expr.charAt(pos) == '*') {
+        operation = expr.charAt(pos);
+      } else {
+        logger(index, offset, "Only three operations are accepted in expressions: +, - and *", true);
+        return false;
+      }
+      pos++;
+    }
+
+    // read unary operation
+    while (pos < expr.length && expr.charAt(pos) == ' ') pos++;
+    if (pos >= expr.length) {
+      logger(index, offset, "Value expected before end of line", true);
+      return false;
+    }
+    var unary = false;
+    if (expr.charAt(pos) == '-' || expr.charAt(pos) == '+') {
+      unary = expr.charAt(pos);
+      pos++;
+    }
+
+    // read next operand
+    while (pos < expr.length && expr.charAt(pos) == ' ') pos++;
+    if (pos >= expr.length) {
+      logger(index, offset, "Value expected before end of line", true);
+      return false;
+    }
+    var value = {};
+    if (expr.charAt(pos) == '(') {
+      value = DCPU.parseExpression(index, offset, expr, pos + 1, labels, logger);
+      if (value) {
+        pos = value.end;
+      } else {
+        return false;
+      }
+    } else {
+      var operand = "";
+      while (pos < expr.length && " +-*/()[],".indexOf(expr.charAt(pos)) == -1) { // TODO: inverse condition
+        operand += expr.charAt(pos);
+        pos++;
+      }
+      if (operand.match(/^[0-9]*$/g)) {
+        value.literal = parseInt(operand, 10);
+      } else
+      if (operand.match(/^0x[0-9a-fA-F]*$/g)) {
+        value.literal = parseInt(operand, 16);
+      } else
+      if (DCPU.regs.indexOf(operand.toUpperCase()) > -1) {
+        value.register = DCPU.regs.indexOf(operand.toUpperCase());
+      } else
+      if (labels) {
+        if (labels[operand.toLowerCase()]) {
+          value.label = operand.toLowerCase();
+          value.literal = labels[value.label];
+        } else {
+          logger(index, offset, "Invalid value: " + operand);
+          return false;
+        }
+      } else
+      if (operand.match(/^[a-zA-Z_.][a-zA-Z_.0-9]+$/)) {
+        value.label = operand.toLowerCase();
+        value.incomplete = true;
+      } else {
+        logger(index, offset, "Invalid value: " + operand);
+        return false;
+      }
+    }
+    // first, apply optional `unary` to `value` (it has highest priority)
+    if (unary == '-') {
+      if (value.literal !== false) {
+        value.literal = -value.literal;
+      } else {
+        value = {operation: 'U-', operands: [value]};
+      }
+    }
+
+    if (res) { // okay, now we have left part in res, operation, and right part as value
+      if (operation == '*' && (res.operation == '+' || res.operation == '-')) {
+        res.operands[1] = {operation: operation, operands: [res.operands[1], value]};
+      } else {
+        res = {operation: operation, operands: [res, value]};
+      }
+    } else { // first value
+      res = value;
+    }
+  }
+
+  if (!res) {
+    return false;
+  }
+  res.end = pos;
+  return res;
+},
+/*
+* Evaluates expression (if it's possible)
+*/
+simplifyExpression: function(expr) {
+  if (!expr) return expr;
+
+  var incomplete = false;
+  for (var i in expr.operands) {
+    expr.operands[i] = DCPU.simplifyExpression(expr.operands[i]);
+    if (expr.operands[i].incomplete) incomplete = true;
+  }
+  switch (expr.operation) {
+    case 'U-': { // unary minus
+      if (expr.operands[0].literal !== undefined) {
+        return {literal: -v.literal, incomplete: incomplete};
+      }
+      return expr;
+    }
+    case '-': {
+      if ((expr.operands[0].literal !== undefined || expr.operands[0].incomplete) && (expr.operands[1].literal !== undefined || expr.operands[1].incomplete)) {
+        return {literal: expr.operands[0].literal - expr.operands[1].literal, incomplete: incomplete};
+      }
+      return expr;
+    }
+    case '+': {
+      if ((expr.operands[0].literal !== undefined || expr.operands[0].incomplete) && (expr.operands[1].literal !== undefined || expr.operands[1].incomplete)) {
+        return {literal: expr.operands[0].literal + expr.operands[1].literal, incomplete: incomplete};
+      }
+      return expr;
+    }
+    case '*': {
+      if ((expr.operands[0].literal !== undefined || expr.operands[0].incomplete) && (expr.operands[1].literal !== undefined || expr.operands[1].incomplete)) {
+        return {literal: expr.operands[0].literal * expr.operands[1].literal, incomplete: incomplete};
+      }
+      return expr;
+    }
+  }
+  return expr;
+},
 /*
 * Parse given string (val) as a value
 * (index - line number, offset - current address, this two params will be passed to function logger in case of some error, along with error message)
@@ -312,62 +471,56 @@ decodeValue: function(index, offset, val, labels, logger) {
     }
     return info;
   }
-  reg = -1;
-  if (pointer && val.indexOf("+") >= 0) { // literal + register
-    var vals = val.split("+");
-    if (!vals || vals.length != 2) {
-      logger(index, offset, "Sum can not contain more than 2 values", true);
-      return false;
-    }
-    reg = DCPU.regs.indexOf(vals[0].trim().toUpperCase());
-    if (reg >= 0) {
-      val = vals[1].trim();
-    } else {
-      reg = DCPU.regs.indexOf(vals[1].trim().toUpperCase());
-      if (reg >= 0) {
-        val = vals[0].trim();
-      } else {
-        logger(index, offset, "Only sum of register and literal as value is allowed", true);
-        return false;
-      }
-    }
-  }
-  var intval = -1;
-  var can_be_label = !labels && val.match(/^[a-zA-Z_.][a-zA-Z_.0-9]+$/);
-  var is_label = false;
-  if (val.match(/^[0-9]{1,5}$/g)) {
-    intval = parseInt(val, 10);
-  } else
-  if (val.match(/^0x[0-9a-fA-F]{1,4}$/g)) {
-    intval = parseInt(val, 16);
-  } else
-  if (labels && labels[val.toLowerCase()] !== undefined) {
-    intval = labels[val.toLowerCase()];
-    is_label = true;
-  }
-  if ((intval >= 0 && intval < 0x10000) || can_be_label) { // literal or label [+register]
-    if ((intval < 32) && !pointer && (reg == -1) && !can_be_label && !is_label) { // short form unsupported yet
-      info.code = 0x20 + intval;
-    } else {
-      info.code = (reg > -1 ? (0x10 + reg) : (pointer ? 0x1e : 0x1f));
-      info.nextword = intval;
-      info.size = 1;
-      info.max_size = 1;
-      if (can_be_label) {
-        info.min_size = 0;
-        info.complete = false;
-      }
-    }
-    info.literal = true;
-    return info;
-  } else
-  if (reg > -1) {
-    logger(index, offset, "Only sum of register and literal as value is allowed", true);
+
+  var value = DCPU.parseExpression(index, offset, val, 0, labels, logger);
+  if (!value) {
     return false;
   }
 
-  logger(index, offset, "Unrecognized value: " + val, true);
-  return false;
+  value = DCPU.simplifyExpression(value);
+
+  reg = -1;
+  if (value.operation == '+') {
+    if (value.operands[0].register !== undefined && (value.operands[1].literal !== undefined || value.operands[1].label !== undefined)) {
+      reg = value.operands[0].register;
+      value = value.operands[1];
+    } else
+    if (value.operands[1].register !== undefined && (value.operands[0].literal !== undefined || value.operands[0].label !== undefined)) {
+      reg = value.operands[1].register;
+      value = value.operands[0];
+    } else {
+      logger(index, offset, "Only sum of register and literal as value is allowed", true);
+      return false;
+    }
+  }
+
+  if (value.literal == undefined && value.label === undefined) {
+    logger(index, offset, "Expression " + val + " is too complex, unable to simplify into sum of register and literal");
+    return false;
+  }
+
+  if (value.literal !== undefined && (value.literal < 0 || value.literal > 0xffff)) {
+    if (labels) {
+      logger(index, offset, "(Warning) Literal value " + value.literal.toString(16) + " will be truncated to " + (value.literal & 0xffff).toString(16));
+    }
+    value.literal = value.literal & 0xffff;
+  }
+
+  if (!pointer && value.label === undefined && value.literal !== undefined && value.literal < 32) {
+    info.code = 0x20 + value.literal;
+  } else {
+    info.code = (reg > -1 ? (0x10 + reg) : (pointer ? 0x1e : 0x1f));
+    info.nextword = value.literal;
+    info.size = 1;
+    info.max_size = 1;
+    if (value.literal === undefined) {
+      info.min_size = 0;
+      info.complete = false;
+    }
+  }
+
+  info.literal = true;
+  return info;
 },
 
 /*
