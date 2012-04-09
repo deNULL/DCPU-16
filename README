@@ -1,2 +1,13 @@
 DCPU-16 Assembler & Emulator
 for upcoming Notch's game 0x10c (0x10c.com)
+
+Features:
+- side-by-side viewing of source/machine codes/line numbers/addresses
+- optional highlighting current line (which PC register points to)
+- registers/full memory dump views
+- running/stepping
+- breakpoints
+- cycles counter
+- 32x12 screen with colors
+- keyboard input
+- arithmetic expressions!
