@@ -337,10 +337,10 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
         operand += expr.charAt(pos);
         pos++;
       }
-      if (operand.match(/^[0-9]*$/g)) {
+      if (operand.match(/^[0-9]+$/g)) {
         value.literal = parseInt(operand, 10);
       } else
-      if (operand.match(/^0x[0-9a-fA-F]*$/g)) {
+      if (operand.match(/^0x[0-9a-fA-F]+$/g)) {
         value.literal = parseInt(operand, 16);
       } else
       if (DCPU.regs.indexOf(operand.toUpperCase()) > -1) {
@@ -612,20 +612,28 @@ compileLine: function(index, offset, line, labels, logger) {
             info.dump.push(vals[j].charCodeAt(k));
           }
         } else {
-          var intval = -1;
-          if (vals[j].match(/^[0-9]{1,5}$/g)) {
-            intval = parseInt(vals[j], 10);
-          } else
-          if (vals[j].match(/^0x[0-9a-fA-F]{1,4}$/g)) {
-            intval = parseInt(vals[j], 16);
+          var value = DCPU.parseExpression(index, offset, vals[j], 0, labels, logger);
+          if (value) {
+            value = DCPU.simplifyExpression(value);
           }
-          if (intval < 0 || intval > 0xFFFF) {
-            logger(index, offset, "Unknown literal " + vals[j], true);
+          if (!value) {
             return false;
           }
+          if (value.literal === undefined && !value.incomplete) {
+            logger(index, offset, "Literal expected", true);
+            return false;
+          }
+
+          if (value.literal < 0 || value.literal > 0xffff) {
+            if (labels) {
+              logger(index, offset, "(Warning) Literal value " + value.literal.toString(16) + " will be truncated to " + (value.literal & 0xffff).toString(16));
+            }
+            value.literal = value.literal & 0xffff;
+          }
+
           info.max_size++;
           info.size++;
-          info.dump.push(intval);
+          info.dump.push(value.literal);
         }
       }
     }

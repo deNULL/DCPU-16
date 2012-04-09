@@ -393,10 +393,13 @@
             if (placed) {
               memory[i] = 0;
             } else
-            if (memory[i] == 0) {
+            if (!memory[i]) {
               memory[i] = key;
               placed = true;
             }
+          }
+          if (placed) {
+            updateMemoryView();
           }
           return false;
         }
@@ -662,7 +665,9 @@
       var code = {};
       var stack = [];
       var conditional = false;
-      stack.push(0);
+      if (data.length > 0) {
+        stack.push(0);
+      }
       while (stack.length > 0) {
         var pc = stack.pop();
         if (used[pc]) {
