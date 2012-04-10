@@ -193,8 +193,9 @@ step: function(memory, registers) {
         DCPU.setValue(aa, 0, memory, copy, registers);
         registers.O = 0;
       } else {
-        DCPU.setValue(aa, parseInt(av / bv) & 0xffff, memory, copy, registers);
-        registers.O = parseInt((av << 16) / bv) & 0xffff;
+        var res = av / bv;
+        DCPU.setValue(aa, parseInt(res) & 0xffff, memory, copy, registers);
+        registers.O = parseInt(res * 0x10000) & 0xffff;
       }
       return DCPU.cycles + 3;
     }
@@ -379,6 +380,9 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
     if (res) { // okay, now we have left part in res, operation, and right part as value
       if (operation == '*' && (res.operation == '+' || res.operation == '-')) {
         res.operands[1] = {operation: operation, operands: [res.operands[1], value]};
+      } else
+      if (operation == '-') {
+        res = {operation: '+', operands: [res, {operation: 'U-', operands: [value]}]};
       } else {
         res = {operation: operation, operands: [res, value]};
       }
@@ -407,7 +411,7 @@ simplifyExpression: function(expr) {
   switch (expr.operation) {
     case 'U-': { // unary minus
       if (expr.operands[0].literal !== undefined) {
-        return {literal: -v.literal, incomplete: incomplete};
+        return {literal: -expr.operands[0].literal, incomplete: incomplete};
       }
       return expr;
     }
@@ -487,7 +491,7 @@ decodeValue: function(index, offset, val, labels, logger) {
   value = DCPU.simplifyExpression(value);
 
   reg = -1;
-  if (value.operation == '+') {
+  if (pointer && value.operation == '+') {
     if (value.operands[0].register !== undefined && (value.operands[1].literal !== undefined || value.operands[1].label !== undefined)) {
       reg = value.operands[0].register;
       value = value.operands[1];
@@ -502,7 +506,7 @@ decodeValue: function(index, offset, val, labels, logger) {
   }
 
   if (value.literal == undefined && value.label === undefined) {
-    logger(index, offset, "Expression " + val + " is too complex, unable to simplify into sum of register and literal");
+    logger(index, offset, "Expression " + val + " is too complex", true);
     return false;
   }
 
