@@ -35,47 +35,47 @@ cycles: 0,
 */
 getValue: function(code, memory, registers, no_change) {
   if (code < 0x8) {
-    return registers[DCPU.regs[code]];
+    return registers[DCPU.regs[code]] || 0;
   } else
   if (code < 0x10) {
-    return memory[registers[DCPU.regs[code - 0x8]]] || 0;
+    return memory[registers[DCPU.regs[code - 0x8]] || 0] || 0;
   } else
   if (code < 0x18) {
-    var nw = memory[registers.PC];
+    var nw = memory[registers.PC] || 0;
     registers.PC = (registers.PC + 1) & 0xffff;
     DCPU.cycles++;
-    return memory[(nw + registers[DCPU.regs[code - 0x10]]) & 0xffff] || 0;
+    return memory[(nw + registers[DCPU.regs[code - 0x10]] || 0) & 0xffff] || 0;
   } else
   if (code == 0x18) { // POP
-    var v = memory[registers.SP];
+    var v = memory[registers.SP || 0] || 0;
     if (!no_change) registers.SP = (registers.SP + 1) & 0xffff;
     return v;
   } else
   if (code == 0x19) { // PEEK
-    return memory[registers.SP];
+    return memory[registers.SP || 0] || 0;
   } else
   if (code == 0x1a) { // PUSH
-    var v = memory[(registers.SP - 1) & 0xffff];
+    var v = memory[(registers.SP - 1) & 0xffff] || 0;
     if (!no_change) registers.SP = (registers.SP - 1) & 0xffff;
     return v;
   } else
   if (code == 0x1b) {
-    return registers.SP;
+    return registers.SP || 0;
   } else
   if (code == 0x1c) {
-    return registers.PC;
+    return registers.PC || 0;
   } else
   if (code == 0x1d) {
-    return registers.O;
+    return registers.O || 0;
   } else
   if (code == 0x1e) {
-    var nw = memory[registers.PC];
+    var nw = memory[registers.PC] || 0;
     DCPU.cycles++;
     registers.PC = (registers.PC + 1) & 0xffff;
-    return memory[nw];
+    return memory[nw] || 0;
   } else
   if (code == 0x1f) {
-    var nw = memory[registers.PC];
+    var nw = memory[registers.PC] || 0;
     DCPU.cycles++;
     registers.PC = (registers.PC + 1) & 0xffff;
     return nw;

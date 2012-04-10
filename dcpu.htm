@@ -406,7 +406,7 @@
     }
     function updateRegisters() {
       for (var reg in registers) {
-        document.getElementById("reg" + reg).innerHTML = pad(registers[reg].toString(16), 4);
+        document.getElementById("reg" + reg).innerHTML = pad(parseInt(registers[reg]).toString(16), 4);
       }
       document.getElementById("cycles").innerHTML = cycles;
     }
