@@ -681,10 +681,10 @@ compileLine: function(index, offset, line, labels, logger) {
   info.max_size = 1 + vala.max_size + valb.max_size;
   if (vala.complete && valb.complete) {
     info.dump.push(opcode | (vala.code << 4) | (valb.code << 10));
-    if (vala.nextword) {
+    if (vala.nextword !== undefined) {
       info.dump.push(vala.nextword);
     }
-    if (valb.nextword) {
+    if (valb.nextword !== undefined) {
       info.dump.push(valb.nextword);
     }
   }
