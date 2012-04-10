@@ -212,9 +212,10 @@ step: function(memory, registers) {
       return DCPU.cycles + 2;
     }
     case 0x8: {
-      var v = DCPU.getValue(aa, memory, registers) >> DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
-      registers.O = (v << 16) & 0xffff;
+      var av = DCPU.getValue(aa, memory, registers);
+      var bv = DCPU.getValue(bb, memory, registers);
+      DCPU.setValue(aa, (av >> bv) & 0xffff, memory, copy, registers);
+      registers.O = ((av << 16) >> bv) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x9: {
