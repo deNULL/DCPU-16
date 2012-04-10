@@ -516,13 +516,15 @@
         updateMemoryView();
       } else {
         runningTimer = setInterval(function() {
-          for (var i = 0; i < 2173; i++) {
+          var was_cycles = cycles;
+          for (var i = 0; i < 10000; i++) {
             cycles += DCPU.step(memory, registers);
             if (!runningTimer) return;
             if (breaks[memToLine[registers.PC] - 1]) {
               run(button);
               return;
             }
+            if (cycles > was_cycles + 5213) break;
           }
           updateHighlight();
           updateRegisters();
