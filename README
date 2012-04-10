@@ -1,4 +1,4 @@
-DCPU-16 Assembler & Emulator
+DCPU-16 Assembler, Emulator & Disassembler
 for upcoming Notch's game 0x10c (0x10c.com)
 
 Features:
@@ -11,3 +11,7 @@ Features:
 - 32x12 screen with colors
 - keyboard input
 - arithmetic expressions!
+- disassembler
+
+Actual version is always available at
+http://denull.ru/dcpu/dcpu.htm
