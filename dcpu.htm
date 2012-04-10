@@ -313,8 +313,7 @@
     </div>
     <div id="tab1_wrapper">
     <table width="100%" id="disassembler" cellpadding=0 cellspacing=0><tr valign=top>
-      <td width="40%"><textarea class="editor" id="da_input" onkeyup="disassemble()" onchange="disassemble()" wrap=off>
-      </textarea></td>
+      <td width="40%"><textarea class="editor" id="da_input" onkeyup="disassemble()" onchange="disassemble()" wrap=off></textarea></td>
       <td width="30"><div class="editor" id="da_lines"></div></td>
       <td width="60%"><div class="editor" id="da_code"></div></td>
     </tr></table>
@@ -371,6 +370,7 @@
     var breaks = {};
     // Not final yet! Will most probably change after clarifications from Notch
     var keymap = {0x0d: 0x0a, 0x25: 0x01, 0x27: 0x02, 0x26: 0x03, 0x28: 0x04};
+    var keypointer = 0;
     document.onkeydown = function(event) {
       var e = event || window.event;
       var key = e.keyCode;
@@ -388,17 +388,9 @@
           if (!runningTimer) {
             return true;
           }
-          var placed = false;
-          for (var i = 0x9000; i < 0x900f; i++) {
-            if (placed) {
-              memory[i] = 0;
-            } else
-            if (!memory[i]) {
-              memory[i] = key;
-              placed = true;
-            }
-          }
-          if (placed) {
+          if (!memory[keypointer + 0x9000]) {
+            memory[keypointer + 0x9000] = key;
+            keypointer = (keypointer + 1) % 0x10;
             updateMemoryView();
           }
           return false;
