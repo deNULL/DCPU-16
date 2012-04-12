@@ -1,11 +1,35 @@
 <html>
 <head>
   <title>DCPU-16 emulator</title>
-  <script type="text/javascript" src="dcpu.js"></script>
+  <script type="text/javascript" src="js/dcpu.js"></script>
   <style>
-    body {
+    body, button {
       font-family: Verdana, Tahoma, sans-serif;
+      font-size: 14px;
     }
+    button.big {
+      font-size: 20px;
+      width: 160px;
+      height: 40px;
+      text-align: left;
+      margin: 4px;
+    }
+    .filewrap {
+      margin: 6px 6px 0px 0px;
+      position: relative;
+      display: inline-block;
+    }
+    .filewrap .file {
+      position: absolute;
+      opacity: 0;
+      -moz-opacity: 0;
+      filter:alpha(opacity=0);
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -100;
+    }
+
     h3 {
       font-size: 22px;
       margin-bottom: 0px;
@@ -64,13 +88,6 @@
     }
     #da_code {
       padding: 4px;
-    }
-    #debugger button {
-      font-size: 20px;
-      width: 160px;
-      height: 40px;
-      text-align: left;
-      margin: 4px;
     }
     #log {
       padding-top: 6px;
@@ -209,6 +226,9 @@
     #da_code .kw {
       color: #077;
     }
+    #da_code .lbl {
+      color: #707;
+    }
     .tabs {
       margin-bottom: 2px;
     }
@@ -228,6 +248,10 @@
       border-radius: 4px 4px 0px 0px;
       margin: 0px 5px;
     }
+    #disassembleDump {
+      float: right;
+      margin-top: 19px;
+    }
   </style>
 </head>
 <body>
@@ -240,7 +264,8 @@
     <div id="tab0_wrapper">
     <table width="100%" id="assembler" cellpadding=0 cellspacing=0><tr valign=top>
       <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
-      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off>
+      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off placeholder="Place your code here"><?php
+$default_code = <<<EOF
     ; Try some basic stuff
                   SET A, 0x30              ; 7c01 0030
                   SET [0x1000], 0x20       ; 7de1 1000 0020
@@ -269,7 +294,13 @@
 
     ; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
     ;      but my assembler doesn't support short form labels yet.
-      </textarea></td>
+EOF;
+$code = $default_code;
+if (isset($_REQUEST['code'])) {
+  $code = $_REQUEST['code'];
+}
+echo htmlspecialchars($code);?></textarea>
+</td>
       <!--
     ; Assembler test for DCPU
     ; by Markus Persson
@@ -308,21 +339,36 @@
       -->
       <td width="30"><div class="hlight_wrap"><div class="line_highlight" id="hlight3"></div></div><div class="editor" id="offsets"></div></td>
       <td width="40%"><div class="hlight_wrap"><div class="line_highlight" id="hlight4"></div></div><div class="editor" id="dump"></div></td>
-    </tr></table>
-    <div class="notice">Click on the line numbers to toggle breakpoints.</div>
+    </tr>
+<tr valign=top><td></td><td colspan=3>
+<!--<button id="loadsrc" onclick="ge('savesrc_f').click();">Load source...</button>
+<button onclick="ge('savesrc_f').click();" id="savesrc">Save source...</button>
+<button onclick="ge('savebin_f').click();" id="savebin">Save assembled code...</button>-->
+<span class="notice">Click on the line numbers to toggle breakpoints.</span>
+</td></tr>
+    </table>
     </div>
     <div id="tab1_wrapper">
     <table width="100%" id="disassembler" cellpadding=0 cellspacing=0><tr valign=top>
-      <td width="40%"><textarea class="editor" id="da_input" onkeyup="disassemble()" onchange="disassemble()" wrap=off></textarea></td>
+      <td width="40%"><textarea class="editor" id="da_input" onkeyup="disassemble()" onchange="disassemble()" wrap=off placeholder="Place your hex codes here"></textarea></td>
       <td width="30"><div class="editor" id="da_lines"></div></td>
       <td width="60%"><div class="editor" id="da_code"></div></td>
-    </tr></table>
+    </tr>
+<tr valign=top><td colspan=3>
+<!--<button onclick="loadbin()" id="loadbin">Load binary...</button>
+<button onclick="savebin2()" id="savebin2">Save binary...</button>
+<button onclick="savedisasm()" id="savedisasm">Save disassembled code...</button>-->
+</td></tr>
+    </table>
     </div>
   </td>
   <td rowspan=2 width="20%" id="debugger" style="padding-left: 20px">
     <span>Cycles: </span><span id="cycles">0</span><br/>
-    <button onclick="run(this)" id="button_run"/>&#8595; Run (F5)</button><button onclick="step()" />&#8618; Step (F6)</button><button onclick="reset()">&#8634; Reset</button><br/>
+    <button onclick="run(this)" id="button_run" class="big"/>&#8595; Run (F5)</button><button onclick="step()"  class="big"/>&#8618; Step (F6)</button><button onclick="reset()" class="big">&#8634; Reset</button><br/>
     <label for="show_pc"><input type="checkbox" id="show_pc" name="show_pc" checked="checked" onchange="toggleShowPC()"/> Show current line</label>
+    <h4>Screen:</h4>
+    <pre class="editor" id="screen"></pre>
+    <div class="notice">Keyboard input is available while the program is running.</div>
     <h4>Registers:</h4>
     <table border=0 class="editor">
     <tr>
@@ -344,6 +390,7 @@
     </tr>
     </table>
 
+    <button onclick="disassembleDump()" id="disassembleDump">Disassemble</button>
     <h4>Memory dump:</h4>
     <div id="memory_wrapper">
       <div id="memory_window" onscroll="updateMemoryView()">
@@ -352,10 +399,6 @@
         <div id="memory_view" class="editor"></div></div>
       </div>
     </div>
-
-    <h4>Screen:</h4>
-    <pre class="editor" id="screen"></pre>
-    <div class="notice">Keyboard input is available while the program is running.</div>
   </td>
   </tr><tr valign=top>
   <td colspan=3>
@@ -377,7 +420,7 @@
       if (keymap[key]) key = keymap[key];
       switch (key) {
         case 116: { // F5
-          run(document.getElementById("button_run"));
+          run(ge("button_run"));
           return false;
         }
         case 117: { // F6
@@ -400,15 +443,15 @@
     }
     function toggleTab(index) {
       for (var i = 0; i < 2; i++) {
-        document.getElementById("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
-        document.getElementById("tab" + i).className = (index == i) ? "tab_active" : "tab_inactive";
+        ge("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
+        ge("tab" + i).className = (index == i) ? "tab_active" : "tab_inactive";
       }
     }
     function updateRegisters() {
       for (var reg in registers) {
-        document.getElementById("reg" + reg).innerHTML = pad(parseInt(registers[reg]).toString(16), 4);
+        ge("reg" + reg).innerHTML = pad(parseInt(registers[reg]).toString(16), 4);
       }
-      document.getElementById("cycles").innerHTML = cycles;
+      ge("cycles").innerHTML = cycles;
     }
     function toggleShowPC() {
       updateHighlight();
@@ -417,9 +460,9 @@
     function updateMemoryView() {
       var lns = "";
       var s = "";
-      var offs = document.getElementById("memory_window").scrollTop * 8;
-      document.getElementById("memory_lines").style.top = (offs / 8) + "px";
-      document.getElementById("memory_view").style.top = (offs / 8) + "px";
+      var offs = ge("memory_window").scrollTop * 8;
+      ge("memory_lines").style.top = (offs / 8) + "px";
+      ge("memory_view").style.top = (offs / 8) + "px";
       for (var i = 0; i < 16; i++) {
         lns += pad((offs + i * 8).toString(16), 4) + ":<br/>";
         for (var j = 0; j < 8; j++) {
@@ -437,8 +480,8 @@
         }
         s += "<br/>";
       }
-      document.getElementById("memory_lines").innerHTML = lns;
-      document.getElementById("memory_view").innerHTML = s;
+      ge("memory_lines").innerHTML = lns;
+      ge("memory_view").innerHTML = s;
 
       s = "";
       var idx = 0x8000;
@@ -462,15 +505,15 @@
         }
         s += "<br/>";
       }
-      document.getElementById("screen").innerHTML = s;
+      ge("screen").innerHTML = s;
     }
     updateMemoryView();
     function positionHighlight(line) {
-      if (!document.getElementById("show_pc").checked) {
+      if (!ge("show_pc").checked) {
         line = -1;
       }
       for (var i = 1; i <= 4; i++) {
-        var hlight = document.getElementById("hlight" + i);
+        var hlight = ge("hlight" + i);
         if (line >= 0) {
           hlight.style.top = line * 19 + 2;
           hlight.style.display = "block";
@@ -535,7 +578,7 @@
     }
     function bp(line) {
       breaks[line] = !breaks[line] && (lineToMem[line] !== undefined);
-      document.getElementById("ln" + line).className = breaks[line] ? "breakpoint" : "";
+      ge("ln" + line).className = breaks[line] ? "breakpoint" : "";
     }
     function pad(v, w) {
       var s = "" + v;
@@ -545,7 +588,7 @@
       return s;
     }
     function assemble() {
-      lastCode = document.getElementById("code").value;
+      lastCode = ge("code").value;
       var lines = lastCode.split("\n");
       var labels = {};
       var linenums = [];
@@ -594,7 +637,11 @@
         } else {
           offsets.push("");
         }
-        sp += info.max_size;
+        if (info.org !== undefined) {
+          sp = info.org;
+        } else {
+          sp += info.max_size;
+        }
       }
       sp = 0;
       for (var i = 0; i < lines.length && !aborted; i++) {
@@ -607,7 +654,11 @@
           memToLine[sp + j] = i + 1;
         }
         dump.push(s);
-        sp += info.max_size;
+        if (info.org !== undefined) {
+          sp = info.org;
+        } else {
+          sp += info.max_size;
+        }
         if (info.op) last = info;
       }
       if (aborted) {
@@ -616,25 +667,24 @@
       }
 
       // update UI
-      document.getElementById("linenums").innerHTML = linenums.join("");
-      document.getElementById("offsets").innerHTML = offsets.join("<br/>");
-      document.getElementById("dump").innerHTML = dump.join("<br/>");
-      document.getElementById("log").innerHTML = log.join("<br/>");
-      document.getElementById("code").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
+      ge("linenums").innerHTML = linenums.join("");
+      ge("offsets").innerHTML = offsets.join("<br/>");
+      ge("dump").innerHTML = dump.join("<br/>");
+      ge("log").innerHTML = log.join("<br/>");
+      ge("code").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
 
       for (var line in breaks) {
         if (breaks[line] && (lineToMem[line] === undefined)) {
           bp(line);
         } else
-          document.getElementById("ln" + line).className = breaks[line] ? "breakpoint" : "";
+          ge("ln" + line).className = breaks[line] ? "breakpoint" : "";
       }
       updateMemoryView();
       updateHighlight();
       updateRegisters();
     }
-    assemble();
     function disassemble() {
-      lastInput = document.getElementById("da_input").value;
+      lastInput = ge("da_input").value;
       var input = lastInput + " ";
       var linenum = lastInput.split("\n").length;
       var data = [];
@@ -663,13 +713,14 @@
       if (data.length > 0) {
         stack.push(0);
       }
+      var labels = {last: 0};
       while (stack.length > 0) {
         var pc = stack.pop();
         if (used[pc]) {
           continue;
         }
         do {
-          var info = DCPU.disassemble(data, pc, logger);
+          var info = DCPU.disassemble(data, pc, labels, logger);
           if (info.branch !== undefined) {
             stack.push(info.branch);
           }
@@ -690,46 +741,76 @@
       var lines = [];
       var output = [];
       for (var i = 0; i < data.length; i++) {
+        if (labels[i]) {
+          lines.push("");
+          output.push("");
+          lines.push("");
+          output.push(":" + wrapAs(labels[i], "lbl"));
+        }
         if (code[i] !== undefined) {
           lines.push(pad(i.toString(16), 4) + ":");
-          output.push(code[i]);
+          output.push("&nbsp;&nbsp;" + code[i]);
         } else
         if (!used[i]) {
-          var line = wrapAs("DAT", "op");
           var words = [];
-          lines.push(pad(i.toString(16), 4) + ":");
+          var all_zeros = true;
+          var old_i = i;
           while (i < data.length && !used[i]) {
             words.push(wrapAs("0x" + pad(data[i].toString(16), 4), "lit"));
+            if (data[i]) all_zeros = false;
             i++;
           }
+          if (all_zeros) {
+            if (i < data.length) {
+              lines.push("");
+              lines.push("");
+              output.push("");
+              output.push(wrapAs("ORG", "op") + " " + wrapAs("0x" + pad(i.toString(16), 4), "lit"));
+            }
+          } else {
+            lines.push(pad(old_i.toString(16), 4) + ":");
+            output.push("&nbsp;&nbsp;" + wrapAs("DAT", "op") + " " + words.join(", "));
+          }
           i--;
-          output.push(line + " " + words.join(", "));
         }
       }
 
       // update UI
-      document.getElementById("da_lines").innerHTML = lines.join("<br/>");
-      document.getElementById("da_code").innerHTML = output.join("<br/>");
-      document.getElementById("log").innerHTML = log.join("<br/>");
-      document.getElementById("da_input").style.height = Math.max(560, ((linenum + 1) * 19 + 9)) + "px";
+      ge("da_lines").innerHTML = lines.join("<br/>");
+      ge("da_code").innerHTML = output.join("<br/>");
+      ge("log").innerHTML = log.join("<br/>");
+      ge("da_input").style.height = Math.max(560, ((linenum + 1) * 19 + 9)) + "px";
+    }
+    function disassembleDump() {
+      var dump = "";
+      var end = 0x7ffe;
+      while (!memory[end] && end > 0) end--;
+      for (var i = 0; i <= end + 1; i++) {
+        dump += pad((memory[i] || 0).toString(16), 4);
+        dump += (i % 8 == 7) ? "\n" : " ";
+      }
+      ge("da_input").value = dump;
+      disassemble();
+      toggleTab(1);
     }
     disassemble();
+    assemble();
     var blink = false;
-    var lastCode = document.getElementById("code").value;
-    var lastInput = document.getElementById("da_input").value;
+    var lastCode = ge("code").value;
+    var lastInput = ge("da_input").value;
     setInterval(function() {
       blink = !blink;
-      var els = document.getElementById("screen").getElementsByTagName("b");
+      var els = ge("screen").getElementsByTagName("b");
       for (var i in els) {
         els[i].className = blink ? "h" : "";
       }
 
-      var code = document.getElementById("code").value;
+      var code = ge("code").value;
       if (code != lastCode) {
         lastCode = code;
         assemble();
       }
-      var input = document.getElementById("code").value;
+      var input = ge("code").value;
       if (input != lastInput) {
         lastInput = input;
         //disassemble();

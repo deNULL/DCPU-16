@@ -4,6 +4,7 @@
 *
 */
 
+// some common functions, shouldn't actually be here...
 String.prototype.trim = function() {
   var i = 0;
   while (i < this.length && (this.charAt(i) == " " || this.charAt(i) == "\n" || this.charAt(i) == "\r" || this.charAt(i) == "\t")) i++;
@@ -20,6 +21,10 @@ Array.prototype.indexOf = function(v) {
 function wrapAs(s, c) {
   return "<span class='" + c + "'>" + s + "</span>";
 }
+function ge(e) {
+  return document.getElementById(e);
+}
+
 var DCPU = {
 bops: ["SET", "ADD", "SUB", "MUL", "DIV", "MOD", "SHL", "SHR", "AND", "BOR", "XOR", "IFE", "IFN", "IFG", "IFB"],
 cond: ["IFE", "IFN", "IFG", "IFB"],
@@ -393,6 +398,7 @@ parseExpression: function(index, offset, expr, pos, labels, logger) {
   }
 
   if (!res) {
+    logger(index, offset, "Value expected", true);
     return false;
   }
   res.end = pos;
@@ -648,6 +654,25 @@ compileLine: function(index, offset, line, labels, logger) {
     }
     return info;
   }
+  if (info.op == "ORG") {
+    if (vals.length != 1) {
+      logger(index, offset, "ORG requires 1 value, received " + vals.length, true);
+      return false;
+    }
+    var value = DCPU.parseExpression(index, offset, vals[0], 0, labels, logger);
+    if (value) {
+      value = DCPU.simplifyExpression(value);
+    }
+    if (!value) {
+      return false;
+    }
+    if (value.literal === undefined) {
+      logger(index, offset, "Literal expected; labels in ORGs are not yet supported", true);
+      return false;
+    }
+    info.org = value.literal;
+    return info;
+  }
 
   var i = DCPU.bops.indexOf(info.op);
   var vala = {code: 0, max_size: 0, complete: true};
@@ -755,7 +780,7 @@ disassembleValue: function(code, memory, offset, logger) {
 * - terminal
 * - size
 */
-disassemble: function(memory, offset, logger) {
+disassemble: function(memory, offset, labels, logger) {
   var res = {size: 1};
   if (offset >= memory.length) {
     logger(offset, "Disassembler reached end of the file");
@@ -771,9 +796,15 @@ disassemble: function(memory, offset, logger) {
       switch (aa) {
         case 0x1: { // JSR
           var vb = DCPU.disassembleValue(bb, memory, offset + res.size, logger);
+          res.size += vb.size;
           res.code = wrapAs("JSR", "op") + " " + vb.str;
           if (vb.literal !== undefined) {
             res.branch = vb.literal;
+            if (!labels[res.branch]) {
+              labels.last++;
+              labels[res.branch] = "label" + labels.last;
+            }
+            res.code = wrapAs("JSR", "op") + " " + wrapAs(labels[res.branch], "lbl");
           }
           return res;
         }
@@ -797,10 +828,19 @@ disassemble: function(memory, offset, logger) {
         offset += res.size;
         res.terminal = true;
         if (vb.literal === undefined) {
-          logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
+          if (bb != 0x18) // assuming SET PC, POP - RET
+            logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
         } else
         switch (op) {
-          case 0x1: { res.branch = vb.literal; break; }
+          case 0x1: {
+            res.branch = vb.literal;
+            if (!labels[res.branch]) {
+              labels.last++;
+              labels[res.branch] = "label" + labels.last;
+            }
+            res.code = wrapAs(DCPU.bops[op - 1], "op") + " " + va.str + ", " + wrapAs(labels[res.branch], "lbl");
+            break;
+          }
           case 0x2: { res.branch = (offset + vb.literal) & 0xffff; break; }
           case 0x3: { res.branch = (offset - vb.literal) & 0xffff; break; }
           case 0x4: { res.branch = (offset * vb.literal) & 0xffff; break; }
