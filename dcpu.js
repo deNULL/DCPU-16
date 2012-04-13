@@ -584,6 +584,7 @@ compileLine: function(index, offset, line, labels, logger) {
     }
   }
   if (line.length == 0) return info;
+  if (line.charAt(0) == ".") return info;
   var op_end = line.indexOf(" ");
   if (op_end < 0) op_end = line.length;
   info.op = line.substr(0, op_end).toUpperCase();
