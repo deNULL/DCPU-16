@@ -1,7 +1,8 @@
 <html>
 <head>
   <title>DCPU-16 emulator</title>
-  <script type="text/javascript" src="js/dcpu.js"></script>
+  <script type="text/javascript" src="dcpu.js"></script>
+  <script type="text/javascript" src="screen.js"></script>
   <style>
     body, button {
       font-family: Verdana, Tahoma, sans-serif;
@@ -38,7 +39,7 @@
       position: relative;
     }
     .editor, .editor td {
-      font-family: Monaco, Lucida Console, Andale Mono, Courier New, Courier, monospace;
+      font-family: monospace;
       font-size: 14px;
       line-height: 19px;
       margin: 0;
@@ -152,55 +153,11 @@
     #screen {
       background-color: black;
       color: white;
-      font-size: 15px;
-      width: 288px;
-      height: 228px;
-      line-height: 19px;
-      padding: 4px;
+      width: 384px;
+      height: 288px;
+      padding: 0px;
+      border: solid 5px #444;
     }
-    #screen u, #screen b {
-      display: inline-block;
-      width: 9px;
-      height: 19px;
-      text-decoration: none;
-      font-weight: normal;
-    }
-    #screen .f0 {color: #000000;}
-    #screen .f1 {color: #000080;}
-    #screen .f2 {color: #008000;}
-    #screen .f3 {color: #008080;}
-    #screen .f4 {color: #800000;}
-    #screen .f5 {color: #800080;}
-    #screen .f6 {color: #808000;}
-    #screen .f7 {color: #808080;}
-    #screen .f8 {color: #C0C0C0;}
-    #screen .f9 {color: #0000F0;}
-    #screen .fa {color: #00F000;}
-    #screen .fb {color: #00F0F0;}
-    #screen .fc {color: #F00000;}
-    #screen .fd {color: #F000F0;}
-    #screen .fe {color: #F0F000;}
-    #screen .ff {color: #F0F0F0;}
-
-    #screen .b0 {background-color: #000000;}
-    #screen .b1 {background-color: #000080;}
-    #screen .b2 {background-color: #008000;}
-    #screen .b3 {background-color: #008080;}
-    #screen .b4 {background-color: #800000;}
-    #screen .b5 {background-color: #800080;}
-    #screen .b6 {background-color: #808000;}
-    #screen .b7 {background-color: #808080;}
-    #screen .b8 {background-color: #C0C0C0;}
-    #screen .b9 {background-color: #0000F0;}
-    #screen .ba {background-color: #00F000;}
-    #screen .bb {background-color: #00F0F0;}
-    #screen .bc {background-color: #F00000;}
-    #screen .bd {background-color: #F000F0;}
-    #screen .be {background-color: #F0F000;}
-    #screen .bf {background-color: #F0F0F0;}
-
-    #screen .h {visibility: hidden;}
-
     .notice {
       margin: 6px 0px 10px 0px;
       color: gray;
@@ -264,42 +221,9 @@
     <div id="tab0_wrapper">
     <table width="100%" id="assembler" cellpadding=0 cellspacing=0><tr valign=top>
       <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
-      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off placeholder="Place your code here"><?php
-$default_code = <<<EOF
-    ; Try some basic stuff
-                  SET A, 0x30              ; 7c01 0030
-                  SET [0x1000], 0x20       ; 7de1 1000 0020
-                  SUB A, [0x1000]          ; 7803 1000
-                  IFN A, 0x10              ; c00d
-                     SET PC, crash         ; 7dc1 001a [*]
-
-    ; Do a loopy thing
-                  SET I, 10                ; a861
-                  SET A, 0x2000            ; 7c01 2000
-    :loop         SET [0x2000+I], [A]      ; 2161 2000
-                  SUB I, 1                 ; 8463
-                  IFN I, 0                 ; 806d
-                     SET PC, loop          ; 7dc1 000d [*]
-
-    ; Call a subroutine
-                  SET X, 0x4               ; 9031
-                  JSR testsub              ; 7c10 0018 [*]
-                  SET PC, crash            ; 7dc1 001a [*]
-
-    :testsub      SHL X, 4                 ; 9037
-                  SET PC, POP              ; 61c1
-
-    ; Hang forever. X should now be 0x40 if everything went right.
-    :crash        SET PC, crash            ; 7dc1 001a [*]
-
-    ; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
-    ;      but my assembler doesn't support short form labels yet.
-EOF;
-$code = $default_code;
-if (isset($_REQUEST['code'])) {
-  $code = $_REQUEST['code'];
-}
-echo htmlspecialchars($code);?></textarea>
+      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off placeholder="Place your code here">
+; your code here
+</textarea>
 </td>
       <!--
     ; Assembler test for DCPU
@@ -367,7 +291,8 @@ echo htmlspecialchars($code);?></textarea>
     <button onclick="run(this)" id="button_run" class="big"/>&#8595; Run (F5)</button><button onclick="step()"  class="big"/>&#8618; Step (F6)</button><button onclick="reset()" class="big">&#8634; Reset</button><br/>
     <label for="show_pc"><input type="checkbox" id="show_pc" name="show_pc" checked="checked" onchange="toggleShowPC()"/> Show current line</label>
     <h4>Screen:</h4>
-    <pre class="editor" id="screen"></pre>
+    <canvas width="128" height="96" id="screen"></canvas><br>
+    <canvas width="128" height="32" style="display:none" id="fontCanvas"></canvas>
     <div class="notice">Keyboard input is available while the program is running.</div>
     <h4>Registers:</h4>
     <table border=0 class="editor">
@@ -457,6 +382,7 @@ echo htmlspecialchars($code);?></textarea>
       updateHighlight();
     }
     updateRegisters();
+
     function updateMemoryView() {
       var lns = "";
       var s = "";
@@ -483,29 +409,6 @@ echo htmlspecialchars($code);?></textarea>
       ge("memory_lines").innerHTML = lns;
       ge("memory_view").innerHTML = s;
 
-      s = "";
-      var idx = 0x8000;
-      for (var i = 0; i < 12; i++) {
-        for (var j = 0; j < 32; j++) {
-          var v = memory[idx];
-          if (v == 13) {
-            s += "<br/>";
-            idx++;
-            break;
-          } else {
-            var fc = (v >> 12) & 0xf;
-            var bc = (v >> 8) & 0xf;
-            var cd = (v & 0x7f);
-            var b = (v >> 7) & 1;
-            if (!v) v = 0x0;
-            if (fc == 0 && bc == 0) fc = 0xf;
-            s += "<u class='f" + fc.toString(16) + " b" + bc.toString(16) + "'>" + (b ? "<b" + (blink ? " class='h'" : "") + ">" : "") + ((cd > 0x20) ? String.fromCharCode(cd) : "&nbsp;") + (b ? "</b>" : "") + "</u>";
-            idx++;
-          }
-        }
-        s += "<br/>";
-      }
-      ge("screen").innerHTML = s;
     }
     updateMemoryView();
     function positionHighlight(line) {
@@ -542,6 +445,15 @@ echo htmlspecialchars($code);?></textarea>
       //log.push(pad(line + 1, 5) + ": " + (fatal ? "(Fatal) " : "") + msg);
       if (fatal) clearInterval(runningTimer);
     };
+
+    function updateViews(x) {
+      updateHighlight();
+      updateRegisters();
+      updateMemoryView();
+      Screen.update(memory);
+      document.getElementById("cycles").innerHTML = cycles;
+    }
+
     function step() {
       cycles += DCPU.step(memory, registers);
       updateHighlight();
@@ -793,6 +705,8 @@ echo htmlspecialchars($code);?></textarea>
       disassemble();
       toggleTab(1);
     }
+
+    Screen.init();
     disassemble();
     assemble();
     var blink = false;
