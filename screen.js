@@ -42,7 +42,7 @@ var Screen = {
         }
       }
     };
-    fontImage.src = '/font.png';
+    fontImage.src = 'font.png';
   },
 
   clear: function() {
