@@ -446,7 +446,7 @@
       if (fatal) clearInterval(runningTimer);
     };
 
-    function updateViews(x) {
+    function updateViews(show_all) {
       updateHighlight();
       updateRegisters();
       updateMemoryView();
@@ -456,19 +456,16 @@
 
     function step() {
       cycles += DCPU.step(memory, registers);
-      updateHighlight();
-      updateRegisters();
-      updateMemoryView();
+      updateViews(true);
     }
+
     var runningTimer = false;
     function run(button) {
       if (runningTimer) {
         clearInterval(runningTimer);
         runningTimer = false;
         button.innerHTML = "&#8595; Run (F5)";
-        updateHighlight();
-        updateRegisters();
-        updateMemoryView();
+        updateViews(true);
       } else {
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
@@ -481,9 +478,7 @@
             }
             if (cycles > was_cycles + 5213) break;
           }
-          updateHighlight();
-          updateRegisters();
-          updateMemoryView();
+          updateViews(false);
         }, 50);
         button.innerHTML = "&#215; Stop (F5)";
       }
@@ -591,9 +586,7 @@
         } else
           ge("ln" + line).className = breaks[line] ? "breakpoint" : "";
       }
-      updateMemoryView();
-      updateHighlight();
-      updateRegisters();
+      updateViews(true);
     }
     function disassemble() {
       lastInput = ge("da_input").value;
