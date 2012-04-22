@@ -525,17 +525,20 @@
           if (DCPU.reserved.indexOf(info.label.toUpperCase()) >= 0) {
             logger(i, sp, "\"" + info.label + "\" is reserved keyword, you can't use it as label name", true);
             break;
-          } else
-          if (labels[info.label]) {
+          } else if (labels[info.label]) {
             logger(i, sp, "Duplicate label \"" + info.label + "\"");
           }
-          labels[info.label] = sp;
+          if (info.op == "=") {
+            labels[info.label] = info.org;
+            info.org = undefined;
+          } else {
+            labels[info.label] = sp;
+          }
         }
         if (sp + info.max_size > 0xFFFF) {
           logger(i, sp, "Code is too big (exceeds 128 Kb), not enough memory", true);
           break;
-        } else
-        if (sp + info.max_size > 0x8000) {
+        } else if (sp + info.max_size > 0x8000) {
           logger(i, sp, "Code is too big (exceeds 64 Kb), overlaps videomemory - there will be glitches on screen)");
         }
         if (info.max_size > 0) {

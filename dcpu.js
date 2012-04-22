@@ -707,6 +707,23 @@ compileLine: function(index, offset, line, labels, logger) {
   } else {
     i = DCPU.nbops.indexOf(info.op);
     if (i == -1) {
+      if (vals.length == 1 && vals[0][0] == "=") {
+        var value = DCPU.parseExpression(index, offset, vals[0].substr(1), 0, labels, logger);
+        if (value) {
+          value = DCPU.simplifyExpression(value);
+        }
+        if (!value) {
+          return false;
+        }
+        if (value.literal === undefined) {
+          logger(index, offset, "Literal expected; labels in = are not yet supported", true);
+          return false;
+        }
+        info.label = info.op.toLowerCase();
+        info.op = "=";
+        info.org = value.literal;
+        return info;
+      }
       logger(index, offset, "Unknown instruction: " + info.op, true);
       return false;
     }
