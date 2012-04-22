@@ -725,7 +725,7 @@ compileLine: function(index, offset, line, labels, logger) {
         }
         info.label = info.op.toLowerCase();
         info.op = "=";
-        info.org = value.literal;
+        info.constant = value.literal;
         return info;
       }
       logger(index, offset, "Unknown instruction: " + info.op, true);

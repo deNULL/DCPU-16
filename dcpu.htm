@@ -536,9 +536,8 @@
           } else if (labels[info.label]) {
             logger(i, sp, "Duplicate label \"" + info.label + "\"");
           }
-          if (info.op == "=") {
-            labels[info.label] = info.org;
-            info.org = undefined;
+          if (info.constant !== undefined) {
+            labels[info.label] = info.constant;
           } else {
             labels[info.label] = sp;
           }
