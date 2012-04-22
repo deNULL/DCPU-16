@@ -133,9 +133,11 @@ skip: function(memory, registers) {
   var op = cur & 0xf;
   var aa = (cur >> 4) & 0x3f;
   var bb = (cur >> 10) & 0x3f;
+  var cycles = DCPU.cycles;
   registers.PC = (registers.PC + 1) & 0xffff;
   DCPU.getValue(aa, memory, registers, true);
   DCPU.getValue(bb, memory, registers, true);
+  DCPU.cycles = cycles;
 },
 /*
 * Steps over the next command (at [PC])
