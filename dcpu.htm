@@ -221,7 +221,7 @@
     <div id="tab0_wrapper">
     <table width="100%" id="assembler" cellpadding=0 cellspacing=0><tr valign=top>
       <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
-      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off placeholder="Place your code here">
+      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off spellcheck=false placeholder="Place your code here">
 ; your code here
 </textarea>
 </td>
@@ -447,9 +447,11 @@
     };
 
     function updateViews(show_all) {
-      updateHighlight();
+      if (show_all) {
+        updateHighlight();
+        updateMemoryView();
+      }
       updateRegisters();
-      updateMemoryView();
       Screen.update(memory);
       document.getElementById("cycles").innerHTML = cycles;
     }
