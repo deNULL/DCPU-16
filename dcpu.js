@@ -675,6 +675,21 @@ compileLine: function(index, offset, line, labels, logger) {
     return info;
   }
 
+  // common aliases
+  if (info.op == "JMP") {
+    info.op = "SET";
+    vals[1] = vals[0];
+    vals[0] = "PC";
+  } else if (info.op == "BRK") {
+    info.op = "SUB";
+    vals[0] = "PC";
+    vals[1] = "1";
+  } else if (info.op == "RET") {
+    info.op = "SET";
+    vals[0] = "PC";
+    vals[1] = "POP";
+  }
+
   var i = DCPU.bops.indexOf(info.op);
   var vala = {code: 0, max_size: 0, complete: true};
   var valb = {code: 0, max_size: 0, complete: true};
