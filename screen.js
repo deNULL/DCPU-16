@@ -67,7 +67,7 @@ var Screen = {
     this.screen.putImageData(this.screenImageData, 0, 0);
   },
 
-  writeChar: function(x, y, c, fg, bg) {
+  writeChar: function(y, x, c, fg, bg) {
     var bits = this.font[c];
     var topLeft = y * 8 * 128 + x * 4 + 4;
     for (var ty = 0; ty < 8; ty++) {
