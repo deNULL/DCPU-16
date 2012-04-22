@@ -151,6 +151,10 @@ step: function(memory, registers) {
     copy[r] = registers[r];
   DCPU.cycles = 0;
 
+  // check for BRK (SUB PC, 1)
+  if (cur == 0x85c3) {
+    return -1;
+  }
   switch (op) {
     case 0x0: {
       switch (aa) {

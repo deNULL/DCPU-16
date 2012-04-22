@@ -455,7 +455,10 @@
     }
 
     function step() {
-      cycles += DCPU.step(memory, registers);
+      var rv = DCPU.step(memory, registers);
+      if (rv > 0) {
+        cycles += rv;
+      }
       updateViews(true);
     }
 
@@ -470,7 +473,12 @@
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
           for (var i = 0; i < 10000; i++) {
-            cycles += DCPU.step(memory, registers);
+            var rv = DCPU.step(memory, registers);
+            if (rv < 0) { // break
+              if (runningTimer) run(button);
+              return;
+            }
+            cycles += rv;
             if (!runningTimer) return;
             if (breaks[memToLine[registers.PC] - 1]) {
               run(button);
@@ -658,8 +666,7 @@
         if (code[i] !== undefined) {
           lines.push(pad(i.toString(16), 4) + ":");
           output.push("&nbsp;&nbsp;" + code[i]);
-        } else
-        if (!used[i]) {
+        } else if (!used[i]) {
           var words = [];
           var all_zeros = true;
           var old_i = i;
