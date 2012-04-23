@@ -151,11 +151,6 @@
     }
     #screen {
       background-color: black;
-      color: white;
-      font-size: 15px;
-      width: 288px;
-      height: 228px;
-      line-height: 19px;
       padding: 4px;
     }
     #screen u, #screen b {
@@ -166,38 +161,38 @@
       font-weight: normal;
     }
     #screen .f0 {color: #000000;}
-    #screen .f1 {color: #000080;}
-    #screen .f2 {color: #008000;}
-    #screen .f3 {color: #008080;}
-    #screen .f4 {color: #800000;}
-    #screen .f5 {color: #800080;}
-    #screen .f6 {color: #808000;}
-    #screen .f7 {color: #808080;}
-    #screen .f8 {color: #C0C0C0;}
-    #screen .f9 {color: #0000F0;}
-    #screen .fa {color: #00F000;}
-    #screen .fb {color: #00F0F0;}
-    #screen .fc {color: #F00000;}
-    #screen .fd {color: #F000F0;}
-    #screen .fe {color: #F0F000;}
-    #screen .ff {color: #F0F0F0;}
+    #screen .f1 {color: #0000aa;}
+    #screen .f2 {color: #00aa00;}
+    #screen .f3 {color: #00aaaa;}
+    #screen .f4 {color: #aa0000;}
+    #screen .f5 {color: #aa00aa;}
+    #screen .f6 {color: #aa5500;}
+    #screen .f7 {color: #aaaaaa;}
+    #screen .f8 {color: #555555;}
+    #screen .f9 {color: #5555ff;}
+    #screen .fa {color: #55ff55;}
+    #screen .fb {color: #55ffff;}
+    #screen .fc {color: #ff5555;}
+    #screen .fd {color: #ff55ff;}
+    #screen .fe {color: #ffff55;}
+    #screen .ff {color: #ffffff;}
 
     #screen .b0 {background-color: #000000;}
-    #screen .b1 {background-color: #000080;}
-    #screen .b2 {background-color: #008000;}
-    #screen .b3 {background-color: #008080;}
-    #screen .b4 {background-color: #800000;}
-    #screen .b5 {background-color: #800080;}
-    #screen .b6 {background-color: #808000;}
-    #screen .b7 {background-color: #808080;}
-    #screen .b8 {background-color: #C0C0C0;}
-    #screen .b9 {background-color: #0000F0;}
-    #screen .ba {background-color: #00F000;}
-    #screen .bb {background-color: #00F0F0;}
-    #screen .bc {background-color: #F00000;}
-    #screen .bd {background-color: #F000F0;}
-    #screen .be {background-color: #F0F000;}
-    #screen .bf {background-color: #F0F0F0;}
+    #screen .b1 {background-color: #0000aa;}
+    #screen .b2 {background-color: #00aa00;}
+    #screen .b3 {background-color: #00aaaa;}
+    #screen .b4 {background-color: #aa0000;}
+    #screen .b5 {background-color: #aa00aa;}
+    #screen .b6 {background-color: #aa5500;}
+    #screen .b7 {background-color: #aaaaaa;}
+    #screen .b8 {background-color: #555555;}
+    #screen .b9 {background-color: #5555ff;}
+    #screen .ba {background-color: #55ff55;}
+    #screen .bb {background-color: #55ffff;}
+    #screen .bc {background-color: #ff5555;}
+    #screen .bd {background-color: #ff55ff;}
+    #screen .be {background-color: #ffff55;}
+    #screen .bf {background-color: #ffffff;}
 
     #screen .h {visibility: hidden;}
 
@@ -367,7 +362,7 @@ echo htmlspecialchars($code);?></textarea>
     <button onclick="run(this)" id="button_run" class="big"/>&#8595; Run (F5)</button><button onclick="step()"  class="big"/>&#8618; Step (F6)</button><button onclick="reset()" class="big">&#8634; Reset</button><br/>
     <label for="show_pc"><input type="checkbox" id="show_pc" name="show_pc" checked="checked" onchange="toggleShowPC()"/> Show current line</label>
     <h4>Screen:</h4>
-    <pre class="editor" id="screen"></pre>
+    <canvas id="screen" width="384" height="288"></canvas>
     <div class="notice">Keyboard input is available while the program is running.</div>
     <h4>Registers:</h4>
     <table border=0 class="editor">
@@ -457,6 +452,73 @@ echo htmlspecialchars($code);?></textarea>
       updateHighlight();
     }
     updateRegisters();
+    var blink = false;
+    var palette = [
+      [0x00, 0x00, 0x00, 0xff],
+      [0x00, 0x00, 0xaa, 0xff],
+      [0x00, 0xaa, 0x00, 0xff],
+      [0x00, 0xaa, 0xaa, 0xff],
+      [0xaa, 0x00, 0x00, 0xff],
+      [0xaa, 0x00, 0xaa, 0xff],
+      [0xaa, 0x55, 0x00, 0xff],
+      [0xaa, 0xaa, 0xaa, 0xff],
+      [0x55, 0x55, 0x55, 0xff],
+      [0x55, 0x55, 0xff, 0xff],
+      [0x55, 0xff, 0x55, 0xff],
+      [0x55, 0xff, 0xff, 0xff],
+      [0xff, 0x55, 0x55, 0xff],
+      [0xff, 0x55, 0xff, 0xff],
+      [0xff, 0xff, 0x55, 0xff],
+      [0xff, 0xff, 0xff, 0xff]
+    ];
+    var ctx = ge('screen').getContext('2d');
+    var image = ctx.createImageData(384, 288);
+    // 0x000f, 0x0808
+    var font = [0x0000, 0x0000, 0x080f, 0x0808, 0x08f8, 0x0808, 0x00ff, 0x0808, 0x0808, 0x0808, 0x08ff, 0x0808, 0x00ff, 0x1414, 0xff00, 0xff08, 0x1f10, 0x1714, 0xfc04, 0xf414, 0x1710, 0x1714, 0xf404, 0xf414, 0xff00, 0xf714, 0x1414, 0x1414, 0xf700, 0xf714, 0x1417, 0x1414, 0x0f08, 0x0f08, 0x14f4, 0x1414, 0xf808, 0xf808, 0x0f08, 0x0f08, 0x001f, 0x1414, 0x00fc, 0x1414, 0xf808, 0xf808, 0xff08, 0xff08, 0x14ff, 0x1414, 0x080f, 0x0000, 0x00f8, 0x0808, 0xffff, 0xffff, 0xf0f0, 0xf0f0, 0xffff, 0x0000, 0x0000, 0xffff, 0x0f0f, 0x0f0f, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x2a1c, 0x2a00, 0x083e, 0x0800, 0x4020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e41, 0x3e00, 0x427f, 0x4000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0x4024, 0x0000, 0x0814, 0x2241, 0x1414, 0x1400, 0x4122, 0x1408, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e49, 0x3a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f0c, 0x7300, 0x7f40, 0x4000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e41, 0xbe00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x7f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x0041, 0x7f00, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x447d, 0x4000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x417f, 0x4000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x704c, 0x7000]; // default font by Notch
+    function redrawScreen() {
+      var offs = 0x8000;
+      var sz = 3; // each screen pixel equals to 3 "real" pixels
+      for (var i = 0; i < 12; i++) {
+        for (var j = 0; j < 32; j++) {
+          var value = memory[offs];
+          var idx = (value & 0x7f) << 1;
+          var blinking = (value & 0x80);
+          var bg_color = palette[0x0];
+          var fg_color = palette[0xf];
+          if ((value >> 8) > 0) {
+            bg_color = palette[(value >> 8) & 0xf];
+            fg_color = palette[(value >> 12) & 0xf];
+          }
+          for (var ax = 0; ax < 4; ax++) {
+            var byte = 0;
+            if (!blinking || !blink) {
+              switch (ax) {
+                case 0: byte = memory[0x8180 + idx] >> 8; break;
+                case 1: byte = memory[0x8180 + idx] & 0xff; break;
+                case 2: byte = memory[0x8181 + idx] >> 8; break;
+                case 3: byte = memory[0x8181 + idx] & 0xff; break;
+              }
+            }
+            for (var ay = 0; ay < 8; ay++) {
+              var color = (byte & 1) ? fg_color : bg_color;
+              for (var x = 0; x < sz; x++) {
+                for (var y = 0; y < sz; y++) {
+                  for (var k = 0; k < 4; k++) {
+                    // oh, we are so deep now...
+                    image.data[((i * 8 + ay) * sz + y) * (32 * 4 * sz * 4) + ((j * 4 + ax) * sz + x) * 4 + k] = color[k];
+                  }
+                }
+              }
+              byte >>= 1;
+            }
+          }
+          offs++;
+        }
+      }
+      ctx.putImageData(image, 0, 0); // redraw
+      var back_color = palette[memory[0x8280] & 0xf];
+      ge('screen').style.backgroundColor = '#' + pad(back_color[0].toString(16), 2) + pad(back_color[1].toString(16), 2) + pad(back_color[2].toString(16), 2);
+    }
     function updateMemoryView() {
       var lns = "";
       var s = "";
@@ -483,29 +545,7 @@ echo htmlspecialchars($code);?></textarea>
       ge("memory_lines").innerHTML = lns;
       ge("memory_view").innerHTML = s;
 
-      s = "";
-      var idx = 0x8000;
-      for (var i = 0; i < 12; i++) {
-        for (var j = 0; j < 32; j++) {
-          var v = memory[idx];
-          if (v == 13) {
-            s += "<br/>";
-            idx++;
-            break;
-          } else {
-            var fc = (v >> 12) & 0xf;
-            var bc = (v >> 8) & 0xf;
-            var cd = (v & 0x7f);
-            var b = (v >> 7) & 1;
-            if (!v) v = 0x0;
-            if (fc == 0 && bc == 0) fc = 0xf;
-            s += "<u class='f" + fc.toString(16) + " b" + bc.toString(16) + "'>" + (b ? "<b" + (blink ? " class='h'" : "") + ">" : "") + ((cd > 0x20) ? String.fromCharCode(cd) : "&nbsp;") + (b ? "</b>" : "") + "</u>";
-            idx++;
-          }
-        }
-        s += "<br/>";
-      }
-      ge("screen").innerHTML = s;
+      redrawScreen();
     }
     updateMemoryView();
     function positionHighlight(line) {
@@ -529,6 +569,9 @@ echo htmlspecialchars($code);?></textarea>
     function reset() {
       for (var i = 0; i < 0xffff; i++) {
         if (memory[i]) memory[i] = 0;
+      }
+      for (var i = 0; i < 256; i++) {
+        memory[0x8180 + i] = font[i]; // put default font
       }
       for (var reg in registers) {
         registers[reg] = 0;
@@ -610,6 +653,9 @@ echo htmlspecialchars($code);?></textarea>
       }
       for (var i = 0; i < 0xffff; i++) {
         if (memory[i]) memory[i] = 0;
+      }
+      for (var i = 0; i < 256; i++) {
+        memory[0x8180 + i] = font[i]; // put default font
       }
       for (var i = 0; i < lines.length && !aborted; i++) {
         var info = DCPU.compileLine(i, sp, lines[i], false, logger);
@@ -794,16 +840,12 @@ echo htmlspecialchars($code);?></textarea>
       toggleTab(1);
     }
     disassemble();
-    assemble();
-    var blink = false;
+    reset();
     var lastCode = ge("code").value;
     var lastInput = ge("da_input").value;
     setInterval(function() {
       blink = !blink;
-      var els = ge("screen").getElementsByTagName("b");
-      for (var i in els) {
-        els[i].className = blink ? "h" : "";
-      }
+      redrawScreen();
 
       var code = ge("code").value;
       if (code != lastCode) {
