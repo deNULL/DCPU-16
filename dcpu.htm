@@ -515,11 +515,13 @@
       for (var i = 0; i < lines.length; i++) {
         linenums.push("<u id=ln" + i + " onclick='bp(" + i + ")'>" + (i + 1) + "</u>");
       }
+      ge("linenums").innerHTML = linenums.join("");
 
       var logger = function(line, address, pos, message, fatal) {
         log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " +
           (fatal ? "(<span class='fatal'>Fatal</span>) " : "") +
           message);
+        ge("ln" + line).style.backgroundColor = '#f88';
       };
       for (var i = 0; i < 0xffff; i++) {
         if (memory[i]) memory[i] = 0;
@@ -551,7 +553,6 @@
       }
 
       // update UI
-      ge("linenums").innerHTML = linenums.join("");
       ge("offsets").innerHTML = offsets.join("<br/>");
       ge("dump").innerHTML = dump.join("<br/>");
       ge("log").innerHTML = log.join("<br/>");

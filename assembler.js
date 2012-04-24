@@ -553,7 +553,7 @@ var Assembler = {
   },
 
   /**
-   * Assemble a list of lines of code.
+   * Compile a list of lines of code.
    *   - lines: array of strings, lines of DCPU assembly to compile
    *   - memory: array of DCPU memory to fill in with compiled code
    *   - logger: (line#, address, line_pos, text, fatal) function to collect warnings/errors
