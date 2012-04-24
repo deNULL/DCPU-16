@@ -65,9 +65,6 @@ var Assembler = {
         atom.literal = parseInt(operand, 16);
       } else if (this.REGISTERS.indexOf(operand) > -1) {
         atom.register = this.REGISTERS.indexOf(operand);
-      } else if (this.SPECIALS.indexOf(operand) > -1) {
-        logger(pos, "You can't use " + operand.toUpperCase() + " in expressions.", true);
-        return false;
       } else if (operand.match(/^[a-zA-Z_.][a-zA-Z_.0-9]*$/)) {
         atom.label = operand;
       }
@@ -166,6 +163,10 @@ var Assembler = {
     if (expr.literal !== undefined) {
       value = expr.literal;
     } else if (expr.label !== undefined) {
+      if (this.SPECIALS.indexOf(expr.label) > -1) {
+        logger(pos, "You can't use " + expr.label.toUpperCase() + " in expressions.", true);
+        return false;
+      }
       value = labels[expr.label];
       if (value === undefined) {
         if (fatal) logger(expr.loc, "Unresolvable reference to '" + expr.label + "'", true);
@@ -387,12 +388,12 @@ var Assembler = {
       info.code = (pointer ? 0x08 : 0x00) + expr.register;
       return info;
     }
-    if (expr.label !== undefined && this.SPECIALS[expr.label] !== undefined) {
+    if (expr.label !== undefined && this.SPECIALS.indexOf(expr.label) >= 0  ) {
       if (pointer) {
-        logger(state.pos, "You can't use a pointer to " + expr.literal, true);
+        logger(state.pos, "You can't use a pointer to " + expr.label, true);
         return false;
       }
-      info.code = 0x18 + this.SPECIALS.indexOf(expr.literal);
+      info.code = 0x18 + this.SPECIALS.indexOf(expr.label);
       return info;
     }
 
@@ -478,21 +479,12 @@ var Assembler = {
     }
 
     // common aliases
-    if (info.op == "jmp") {
-      info.op = "set";
-      line.args.unshift("pc");
-      line.arg_locs.unshift(0);
-      line.arg_ends.unshift(0);
+    if (info.op == "jmp" && line.args.length == 1) {
+      return this.compileLine("set pc, " + line.args[0], org, labels, logger);
     } else if (info.op == "brk") {
-      info.op = "sub";
-      line.args = [ "pc", "1" ];
-      line.arg_locs = [ 0, 0 ];
-      line.arg_ends = [ 0, 0 ];
+      return this.compileLine("sub pc, 1", org, labels, logger);
     } else if (info.op == "ret") {
-      info.op = "set";
-      line.args = [ "pc", "pop" ];
-      line.arg_locs = [ 0, 0 ];
-      line.arg_ends = [ 0, 0 ];
+      return this.compileLine("set pc, pop", org, labels, logger);
     }
 
     var opcode, a, b;
@@ -503,20 +495,20 @@ var Assembler = {
         return false;
       }
       opcode = i + 1;
-      b = this.parseOperand(this.stateFromArg(line, 1, logger));
-      a = this.parseOperand(this.stateFromArg(line, 0, logger));
+      b = this.parseOperand(this.stateFromArg(line, 1, logger), labels);
+      a = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
     } else {
       i = this.OP_SPECIAL.indexOf(info.op);
       if (i < 0) {
         logger(0, "Unknown instruction: " + info.op, true);
         return false;
       }
-      if (info.args.length != 1) {
+      if (line.args.length != 1) {
         logger(0, "Non-basic instruction " + info.op + " requires 1 value", true);
         return false;
       }
       opcode = 0;
-      b = this.parseOperand(this.stateFromArg(line, 0, logger));
+      b = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
       a = { code: i + 1 };
     }
 
