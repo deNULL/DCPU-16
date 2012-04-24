@@ -351,6 +351,86 @@ var Assembler = {
     return info;
   },
 
+  /**
+   * Parse an operand expression into:
+   *   - code: 5-bit value for the operand in an opcode
+   *   - immediate: (optional) if the opcode has an immediate word attached
+   *   - expr: if the operand expression can't be evaluated yet (needs to wait for the 2nd pass)
+   */
+  parseOperand: function(state, labels) {
+    var text = state.text;
+    var pos = state.pos;
+    var end = state.end;
+    var info = { };
+
+    var pointer = false;
+    if (state.text.charAt(state.pos) == '[') {
+      if (state.pos + 2 >= state.end || state.text.charAt(state.end - 1) != ']') {
+        logger(state.pos, "Missing ']'", true);
+        return false;
+      }
+      pointer = true;
+      state.pos++;
+      state.end--;
+    }
+
+    var expr = this.parseExpression(state);
+    if (!expr) return false;
+
+    // simple cases: register, special mode
+    if (expr.register !== undefined) {
+      info.code = (pointer ? 0x08 : 0x00) + expr.register;
+      return info;
+    }
+    if (expr.literal !== undefined && this.SPECIALS[expr.literal] !== undefined) {
+      if (pointer) {
+        logger(state.pos, "You can't use a pointer to " + expr.literal, true);
+        return false;
+      }
+      info.code = 0x18 + this.SPECIALS.indexOf(expr.literal);
+      return info;
+    }
+
+    // special case: [literal + register]
+    if (pointer && expr.binary !== undefined &&
+        (expr.left.register !== undefined || expr.right.register !== undefined)) {
+      if (expr.binary != '+') {
+        logger(state.pos, "Only a sum of a value + register is allowed");
+        return false;
+      }
+      if (expr.left.register !== undefined) {
+        // switch the register to the right side
+        var swap = expr.left;
+        expr.left = expr.right;
+        expr.right = swap;
+      }
+      info.code = 0x10 + expr.right.register;
+      var address = this.evalConstant(expr.left, labels, false);
+      if (address) {
+        info.immediate = address;
+      } else {
+        info.expr = expr.left;
+      }
+      return info;
+    }
+
+    // try resolving the expression if we can
+    var value = this.evalConstant(expr, labels, false);
+    if (value) {
+      if (!pointer && value < 32) {
+        info.code = 0x20 + value;
+      } else {
+        info.code = (pointer ? 0x1e : 0x1f);
+        info.immediate = value;
+      }
+    } else {
+      // save it for the second pass.
+      info.code = (pointer ? 0x1e : 0x1f);
+      info.expr = expr;
+    }
+    return info;
+  },
+
   /*
    * Compile a line of code:
    *
