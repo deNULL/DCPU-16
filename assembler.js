@@ -222,6 +222,8 @@ var Assembler = {
       logger(0, name + " is a reserved word and can't be used as a constant.", true);
       return true;
     }
+    if (labels[name]) logger(0, "Duplicate label \"" + name + "\"");
+
     // manually find position of expression, for displaying nice error messages.
     var pos = text.indexOf('=') + 1;
     while (text.charAt(pos).match(/\s/)) pos++;
@@ -265,8 +267,14 @@ var Assembler = {
 
     while (pos < end && text.charAt(pos).match(/\s/)) pos++;
     if (pos == end) return line;
+    if (text.charAt(pos) == ';') return line;
 
-    line.op = text.substr(pos, end - pos).match(/\S+/)[0].toLowerCase();
+    var word = text.substr(pos, end - pos).match(/[A-Za-z]+/);
+    if (!word) {
+      logger(pos, "Inscrutable opcode", true);
+      return false;
+    }
+    line.op = word[0].toLowerCase();
     pos += line.op.length;
 
     var args = [ "" ];
@@ -287,6 +295,8 @@ var Assembler = {
         arg_locs.push(-1);
         arg_ends.push(-1);
         n += 1;
+      } else if (text.charAt(i) == ';' && !in_string) {
+        break;
       } else if (in_string || text.charAt(i) != ' ') {
         if (arg_locs[n] == -1) arg_locs[n] = i;
         args[n] += text.charAt(i);
@@ -460,7 +470,9 @@ var Assembler = {
   compileLine: function(text, org, labels, logger) {
     var line = this.parseLine(text, logger);
     if (!line) return false;
+    if (line.label) labels[line.label] = org;
     var info = { op: line.op, size: 0, dump: [] };
+    if (info.op === undefined) return info;
 
     if (info.op == "dat") {
       return this.handleData(info, line, labels, logger);
@@ -475,6 +487,7 @@ var Assembler = {
       var value = this.evalConstant(expr, labels, true);
       if (!value) return false;
       info.org = value;
+      if (line.label) labels[line.label] = org;
       return info;
     }
 
@@ -519,7 +532,23 @@ var Assembler = {
     if (b.immediate !== undefined) info.dump.push(b.immediate);
     info.a = a;
     info.b = b;
-    if (line.label) labels[line.label] = org;
+    return info;
+  },
+
+  resolveLine: function(info, labels, logger) {
+    var index = 1;
+    if (info.a !== undefined && info.a.expr !== undefined) {
+      var a = this.resolveOperand(info.a, labels, logger);
+      if (!a) return false;
+      info.a = a;
+      info.dump[index++] = a.immediate;
+    }
+    if (info.b !== undefined && info.b.expr !== undefined) {
+      var b = this.resolveOperand(info.b, labels, logger);
+      if (!b) return false;
+      info.b = b;
+      info.dump[index++] = b.immediate;
+    }
     return info;
   },
 
@@ -528,4 +557,129 @@ var Assembler = {
 //      logger(index, offset, "(Warning) Assignment to literal " + vals[0] + " will be ignored");
 //    }
 
+  /**
+   * Assemble a list of lines of code.
+   *   - lines: array of strings, lines of DCPU assembly to compile
+   *   - memory: array of DCPU memory to fill in with compiled code
+   *   - logger: (line#, address, line_pos, text, fatal) function to collect warnings/errors
+   * If successful, returns:
+   *   - infos: opcode info per line
+   */
+  compile: function(lines, memory, logger) {
+    var labels = { };
+    var aborted = false;
+    var pc = 0;
+    var infos = [ ];
+
+    for (var i = 0; i < lines.length && !aborted; i++) {
+      var l_logger = function(pos, text, fatal) {
+        logger(i, pc, pos, text, fatal);
+        if (fatal) aborted = true;
+      };
+      if (!this.parseConstant(lines[i], labels, l_logger)) {
+        var info = this.compileLine(lines[i], pc, labels, l_logger);
+        if (!info) break;
+        if (pc + info.size > 0xffff) {
+          l_logger(0, "Code is too big (exceeds 128 KB) -- not enough memory", true);
+          break;
+        } else if (pc + info.size > 0x8000) {
+          l_logger(0, "Code is too big (exceeds 64 KB) -- overlaps video memory");
+        }
+        if (info.org !== undefined) {
+          pc = info.org;
+          info.pc = pc;
+        } else {
+          info.pc = pc;
+          pc += info.size;
+        }
+        infos[i] = info;
+      }
+    }
+    if (aborted) return false;
+
+    // second pass -- resolve any leftover addresses:
+    for (var i = 0; i < lines.length && !aborted; i++) {
+      if (infos[i] === undefined) continue;
+      var l_logger = function(pos, text, fatal) {
+        logger(i + 1, pc, pos, text, fatal);
+        if (fatal) aborted = true;
+      };
+      infos[i] = this.resolveLine(infos[i], labels, l_logger);
+      if (!infos[i]) break;
+      for (var j = 0; j < infos[i].dump.length; j++) {
+        memory[infos[i].pc + j] = infos[i].dump[j];
+      }
+    }
+    if (aborted) return false;
+
+    return { infos: infos };
+  },
+
+/*
+    function assemble() {
+      lastCode = ge("code").value;
+      var lines = lastCode.split("\n");
+      var linenums = [];
+      var offsets = [];
+      var dump = [];
+      var log = [];
+      var aborted = false;
+      var logger = function(line, offset, msg, fatal) {
+        log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
+        if (fatal) aborted = true;
+      };
+      // get values of labels
+      var sp = 0;
+      var last = false;
+      memToLine = {};
+      lineToMem = {};
+      for (var i = 0; i < lines.length && !aborted; i++) {
+        linenums.push("<u id=ln" + i + " onclick='bp(" + i + ")'>" + (i + 1) + "</u>");
+      }
+      for (var i = 0; i < 0xffff; i++) {
+        if (memory[i]) memory[i] = 0;
+      }
+      for (var i = 0; i < lines.length && !aborted; i++) {
+        var info = DCPU.compileLine(i, sp, lines[i], false, logger);
+        if (aborted) break;
+
+      }
+      sp = 0;
+      for (var i = 0; i < lines.length && !aborted; i++) {
+        var info = DCPU.compileLine(i, sp, lines[i], labels, logger);
+        if (aborted) break;
+        var s = "";
+        for (var j = 0; j < info.dump.length; j++) {
+          s += pad(info.dump[j].toString(16), 4) + " ";
+          memory[sp + j] = info.dump[j];
+          memToLine[sp + j] = i + 1;
+        }
+        dump.push(s);
+        if (info.org !== undefined) {
+          sp = info.org;
+        } else {
+          sp += info.max_size;
+        }
+        if (info.op) last = info;
+      }
+      if (aborted) {
+        offsets = [];
+        dump = [];
+      }
+
+      // update UI
+      ge("linenums").innerHTML = linenums.join("");
+      ge("offsets").innerHTML = offsets.join("<br/>");
+      ge("dump").innerHTML = dump.join("<br/>");
+      ge("log").innerHTML = log.join("<br/>");
+      ge("code").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
+
+      for (var line in breaks) {
+        if (breaks[line] && (lineToMem[line] === undefined)) {
+          bp(line);
+        } else
+          ge("ln" + line).className = breaks[line] ? "breakpoint" : "";
+      }
+      updateViews(true);
+*/
 }
