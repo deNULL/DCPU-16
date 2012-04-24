@@ -3,8 +3,6 @@
  *  by deNULL (me@denull.ru)
  */
 
-// FIXME: support "." as an alias for PC
-
 var Assembler = {
   REGISTERS: [ "a", "b", "c", "x", "y", "z", "i", "j" ],
   SPECIALS: [ "pop", "peek", "push", "sp", "pc", "o" ],
@@ -493,6 +491,12 @@ var Assembler = {
 
     // common aliases
     if (info.op == "jmp" && line.args.length == 1) {
+      info.op = "set";
+      // sneaky: overwrite the "jmp" with "pc" so it can be parsed out later.
+      line.text = "pc " + line.text.substr(3);
+      line.args.push("pc");
+      line.arg_locs.push(0);
+      line.arg_ends.push(2);
       return this.compileLine("set pc, " + line.args[0], org, labels, logger);
     } else if (info.op == "brk") {
       return this.compileLine("sub pc, 1", org, labels, logger);
