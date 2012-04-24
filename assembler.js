@@ -3,10 +3,16 @@
  *  by deNULL (me@denull.ru)
  */
 
+// FIXME: support "." as an alias for PC
+
 var Assembler = {
   REGISTERS: [ "a", "b", "c", "x", "y", "z", "i", "j" ],
   SPECIALS: [ "pop", "peek", "push", "sp", "pc", "o" ],
   BINARY: { '*': 2, '/': 2, '%': 2, '+': 1, '-': 1 },
+
+  OP_BINARY: [ "set", "add", "sub", "mul", "div", "mod", "shl", "shr",
+               "and", "bor", "xor", "ife", "ifn", "ifg", "ifb" ],
+  OP_SPECIAL: [ "jsr" ],
 
   /*
    * parser state is passed around in a "state" object:
@@ -323,9 +329,8 @@ var Assembler = {
     return rv;
   },
 
-  parseArgExpression: function(line, i, logger) {
-    var state = { text: line.text, pos: line.arg_locs[i], end: line.arg_ends[i], logger: logger };
-    return this.parseExpression(state, 0);
+  stateFromArg: function(line, i, logger) {
+    return { text: line.text, pos: line.arg_locs[i], end: line.arg_ends[i], logger: logger };
   },
 
   handleData: function(info, line, labels, logger) {
@@ -340,7 +345,7 @@ var Assembler = {
           info.dump.push(arg.charCodeAt(j));
         }
       } else {
-        var expr = this.parseArgExpression(line, i, logger);
+        var expr = this.parseExpression(this.stateFromArg(line, i, logger), 0);
         if (!expr) return false;
         var value = this.evalConstant(expr, labels, true);
         if (!value) return false;
@@ -382,7 +387,7 @@ var Assembler = {
       info.code = (pointer ? 0x08 : 0x00) + expr.register;
       return info;
     }
-    if (expr.literal !== undefined && this.SPECIALS[expr.literal] !== undefined) {
+    if (expr.label !== undefined && this.SPECIALS[expr.label] !== undefined) {
       if (pointer) {
         logger(state.pos, "You can't use a pointer to " + expr.literal, true);
         return false;
@@ -409,6 +414,7 @@ var Assembler = {
       if (address) {
         info.immediate = address;
       } else {
+        info.immediate = 0;
         info.expr = expr.left;
       }
       return info;
@@ -416,7 +422,7 @@ var Assembler = {
 
     // try resolving the expression if we can
     var value = this.evalConstant(expr, labels, false);
-    if (value) {
+    if (value !== false) {
       if (!pointer && value < 32) {
         info.code = 0x20 + value;
       } else {
@@ -426,18 +432,31 @@ var Assembler = {
     } else {
       // save it for the second pass.
       info.code = (pointer ? 0x1e : 0x1f);
+      info.immediate = 0;
       info.expr = expr;
     }
     return info;
   },
 
+  /**
+   * Called during the 2nd pass: resolve any unresolved expressions, or blow up.
+   */
+  resolveOperand: function(info, labels, logger) {
+    var value = this.evalConstant(info.expr, labels, true);
+    if (!value) return false;
+    info.immediate = value;
+    info.expr = undefined;
+    return info;
+  },
+
   /*
-   * Compile a line of code:
+   * Compile a line of code. If either operand can't be resolved yet, it will have an 'expr' field.
+   * The size will already be computed in any case.
    *
    * Returns object with fields:
-   *   op, size, dump (array of words)
+   *   op, size, dump (array of words), a, b
    */
-  compileLine: function(text, labels, logger) {
+  compileLine: function(text, org, labels, logger) {
     var line = this.parseLine(text, logger);
     if (!line) return false;
     var info = { op: line.op, size: 0, dump: [] };
@@ -448,7 +467,7 @@ var Assembler = {
     if (info.op == "org") {
       if (line.args.length != 1) {
         logger(0, "ORG requires a single value", true);
-         return false;
+        return false;
       }
       var expr = this.parseArgExpression(line, 0, logger);
       if (!expr) return false;
@@ -476,5 +495,45 @@ var Assembler = {
       line.arg_ends = [ 0, 0 ];
     }
 
+    var opcode, a, b;
+    var i = this.OP_BINARY.indexOf(info.op);
+    if (i >= 0) {
+      if (line.args.length != 2) {
+        logger(0, "Basic instruction " + info.op + " requires 2 values", true);
+        return false;
+      }
+      opcode = i + 1;
+      b = this.parseOperand(this.stateFromArg(line, 1, logger));
+      a = this.parseOperand(this.stateFromArg(line, 0, logger));
+    } else {
+      i = this.OP_SPECIAL.indexOf(info.op);
+      if (i < 0) {
+        logger(0, "Unknown instruction: " + info.op, true);
+        return false;
+      }
+      if (info.args.length != 1) {
+        logger(0, "Non-basic instruction " + info.op + " requires 1 value", true);
+        return false;
+      }
+      opcode = 0;
+      b = this.parseOperand(this.stateFromArg(line, 0, logger));
+      a = { code: i + 1 };
+    }
+
+    if (!a || !b) return false;
+    info.size = 1 + (a.immediate !== undefined ? 1 : 0) + (b.immediate !== undefined ? 1 : 0);
+    info.dump.push(opcode | (a.code << 4) | (b.code << 10));
+    if (a.immediate !== undefined) info.dump.push(a.immediate);
+    if (b.immediate !== undefined) info.dump.push(b.immediate);
+    info.a = a;
+    info.b = b;
+    if (line.label) labels[line.label] = org;
+    return info;
   },
+
+    // FIXME put this somewhere:
+//    if (vala && valb && vala.literal && !vala.pointer && i < 11 && labels) {
+//      logger(index, offset, "(Warning) Assignment to literal " + vals[0] + " will be ignored");
+//    }
+
 }
