@@ -32,6 +32,7 @@ nbops: ["JSR"],
 regs: ["A", "B", "C", "X", "Y", "Z", "I", "J"],
 add_vals: ["POP", "PEEK", "PUSH", "SP", "PC", "O"],
 reserved: ["A", "B", "C", "X", "Y", "Z", "I", "J", "POP", "PEEK", "PUSH", "SP", "PC", "O"],
+reserved_ops: ["SET", "ADD", "SUB", "MUL", "DIV", "MOD", "SHL", "SHR", "AND", "BOR", "XOR", "IFE", "IFN", "IFG", "IFB", "JSR", "DAT", "ORG"],
 cycles: 0,
 
 /*
@@ -551,7 +552,7 @@ decodeValue: function(index, offset, val, labels, logger) {
 * Returns object with fields:
 * op, size, max_size (at the moment equal to size), dump (array of words)
 */
-compileLine: function(index, offset, line, labels, logger) {
+compileLine: function(index, offset, line, labels, macros, subst, logger) {
   var info = {max_size: 0, size: 0, dump: []};
   var in_string = false;
   for (var i = 0; i < line.length; i++) {
@@ -568,6 +569,64 @@ compileLine: function(index, offset, line, labels, logger) {
   }
   line = line.replace(/\s/g, " ").trim();
   if (line.length == 0) return info;
+  if (macros[" "]) { // " " - current macro
+    if (line.charAt(0) == "}") { // end of macro
+      macros[" "] = false;
+    } else {
+      macros[" "].lines.push(line);
+    }
+    return info;
+  }
+  if (line.charAt(0) == "#") {
+    line = line.substr(1).trim();
+    var dir_end = line.indexOf(" ");
+    if (dir_end < 0) dir_end = line.length;
+    info.directive = line.substr(0, dir_end).toLowerCase();
+    if (info.directive == "macro") {
+      line = line.substr(dir_end).trim();
+      if (line.length == 0 || line.charAt(line.length - 1) != "{") {
+        logger(index, offset, "Invalid macro definition (expected '{' at the end of the line)", true);
+        return false;
+      }
+      line = line.substr(0, line.length - 1).trim();
+
+      var name_end = line.indexOf("(");
+      if (name_end < 0) name_end = line.length;
+      var macro = line.substr(0, name_end).trim().toLowerCase();
+      if (macro.length == 0) {
+        logger(index, offset, "Macro name can not be empty", true);
+        return false;
+      }
+      if (DCPU.reserved_ops.indexOf(macro.toUpperCase()) > -1) {
+        logger(index, offset, "Invalid macro name: " + macro + " (reserved keyword)", true);
+        return false;
+      }
+      macros[" "] = {lines: [], params: []};
+
+      line = line.substr(name_end).trim();
+
+      if (line.length > 0) {
+        if (line.length < 2 || line.charAt(0) != '(' || line.charAt(line.length - 1) != ')') {
+          logger(index, offset, "Invalid macro definition (param list within parentheses expected)", true);
+          return false;
+        }
+        line = line.substr(1, line.length - 2);
+        var param_list = line.split(",");
+        for (var i = 0; i < param_list.length; i++) {
+          macros[" "].params.push(param_list[i].trim().toLowerCase());
+        }
+      }
+
+      macros[macro + "(" + macros[" "].params.length + ")"] = macros[" "];
+      if (!macros[macro]) macros[macro] = [];
+      macros[macro].push(macros[" "].params.length);
+      return info;
+    } else {
+      logger(index, offset, "Unknown directive: #" + info.directive, true);
+      return false;
+    }
+  }
+  if (line.charAt(line.length - 1) == "}" || line.charAt(line.length - 1) == "{") line = line.substr(0, line.length - 1).trim();
   if (line.charAt(0) == ":") {
     line = line.substr(1).trim();
     var label_end = line.indexOf(" ");
@@ -588,9 +647,20 @@ compileLine: function(index, offset, line, labels, logger) {
   if (line.length == 0) return info;
   if (line.charAt(0) == ".") return info;
   var op_end = line.indexOf(" ");
+  var par = line.indexOf("(");
   if (op_end < 0) op_end = line.length;
+  if (par > -1 && par < op_end) op_end = par;
   info.op = line.substr(0, op_end).toUpperCase();
   line = line.substr(op_end).trim();
+  if (subst[info.op.toLowerCase()] !== undefined) {
+    info.op = subst[info.op.toLowerCase()];
+  }
+  var macro_nm = macros[info.op.toLowerCase()];
+  if (macro_nm && macro_nm.length) {
+    if (line.length > 1 && line.charAt(0) == '(' && line.charAt(line.length - 1) == ')') {
+      line = line.substr(1, line.length - 2).trim();
+    }
+  }
   //var vals = line.split(/\s*,\s*/g);
   var vals = [""];
   in_string = false;
@@ -610,11 +680,41 @@ compileLine: function(index, offset, line, labels, logger) {
       vals[vals.length - 1] += line.charAt(i);
     }
   }
+  if (vals[vals.length - 1] == "") vals.pop();
+  for (var i = 0; i < vals.length; i++) { // apply substitutes
+    if (subst[vals[i].toLowerCase()] !== undefined) {
+      vals[i] = subst[vals[i].toLowerCase()];
+    }
+  }
   if (in_string) {
     logger(index, offset, "Expected '\"' before end of line", true);
     return false;
   }
 
+  if (macro_nm && macro_nm.length) {
+    if (macro_nm.indexOf(vals.length) < 0) {
+      logger(index, offset, "Macro '" + info.op.toLowerCase() + "' supports " + macro_nm.join("/") + " arguments, received " + vals.length, true);
+      return false;
+    }
+    var macro = macros[info.op.toLowerCase() + "(" + vals.length + ")"];
+
+    var macro_subst = {};
+    for (var i = 0; i < macro.params.length; i++) { // build substitutes
+      macro_subst[macro.params[i]] = vals[i];
+    }
+    for (var i = 0; i < macro.lines.length; i++) {
+      var macro_info = DCPU.compileLine(index, offset, macro.lines[i], labels, macros, macro_subst, logger);
+      if (!macro_info) {
+        return false; // error is already printed
+      }
+      info.max_size += macro_info.max_size;
+      info.size += macro_info.size;
+      for (var j = 0; j < macro_info.dump.length; j++) {
+        info.dump.push(macro_info.dump[j]);
+      }
+    }
+    return info;
+  }
   if (info.op == "DAT") {
     for (var j = 0; j < vals.length; j++) {
       if (vals[j].length > 0) {
