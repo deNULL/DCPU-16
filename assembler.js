@@ -482,7 +482,7 @@ var Assembler = {
         logger(0, "ORG requires a single value", true);
         return false;
       }
-      var expr = this.parseArgExpression(line, 0, logger);
+      var expr = this.parseExpression(this.stateFromArg(line, 0, logger), 0);
       if (!expr) return false;
       var value = this.evalConstant(expr, labels, true);
       if (!value) return false;
@@ -552,11 +552,6 @@ var Assembler = {
     return info;
   },
 
-    // FIXME put this somewhere:
-//    if (vala && valb && vala.literal && !vala.pointer && i < 11 && labels) {
-//      logger(index, offset, "(Warning) Assignment to literal " + vals[0] + " will be ignored");
-//    }
-
   /**
    * Assemble a list of lines of code.
    *   - lines: array of strings, lines of DCPU assembly to compile
@@ -576,6 +571,7 @@ var Assembler = {
         logger(i, pc, pos, text, fatal);
         if (fatal) aborted = true;
       };
+      labels["."] = pc;
       if (!this.parseConstant(lines[i], labels, l_logger)) {
         var info = this.compileLine(lines[i], pc, labels, l_logger);
         if (!info) break;
@@ -614,72 +610,4 @@ var Assembler = {
 
     return { infos: infos };
   },
-
-/*
-    function assemble() {
-      lastCode = ge("code").value;
-      var lines = lastCode.split("\n");
-      var linenums = [];
-      var offsets = [];
-      var dump = [];
-      var log = [];
-      var aborted = false;
-      var logger = function(line, offset, msg, fatal) {
-        log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
-        if (fatal) aborted = true;
-      };
-      // get values of labels
-      var sp = 0;
-      var last = false;
-      memToLine = {};
-      lineToMem = {};
-      for (var i = 0; i < lines.length && !aborted; i++) {
-        linenums.push("<u id=ln" + i + " onclick='bp(" + i + ")'>" + (i + 1) + "</u>");
-      }
-      for (var i = 0; i < 0xffff; i++) {
-        if (memory[i]) memory[i] = 0;
-      }
-      for (var i = 0; i < lines.length && !aborted; i++) {
-        var info = DCPU.compileLine(i, sp, lines[i], false, logger);
-        if (aborted) break;
-
-      }
-      sp = 0;
-      for (var i = 0; i < lines.length && !aborted; i++) {
-        var info = DCPU.compileLine(i, sp, lines[i], labels, logger);
-        if (aborted) break;
-        var s = "";
-        for (var j = 0; j < info.dump.length; j++) {
-          s += pad(info.dump[j].toString(16), 4) + " ";
-          memory[sp + j] = info.dump[j];
-          memToLine[sp + j] = i + 1;
-        }
-        dump.push(s);
-        if (info.org !== undefined) {
-          sp = info.org;
-        } else {
-          sp += info.max_size;
-        }
-        if (info.op) last = info;
-      }
-      if (aborted) {
-        offsets = [];
-        dump = [];
-      }
-
-      // update UI
-      ge("linenums").innerHTML = linenums.join("");
-      ge("offsets").innerHTML = offsets.join("<br/>");
-      ge("dump").innerHTML = dump.join("<br/>");
-      ge("log").innerHTML = log.join("<br/>");
-      ge("code").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
-
-      for (var line in breaks) {
-        if (breaks[line] && (lineToMem[line] === undefined)) {
-          bp(line);
-        } else
-          ge("ln" + line).className = breaks[line] ? "breakpoint" : "";
-      }
-      updateViews(true);
-*/
 }
