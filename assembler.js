@@ -153,7 +153,7 @@ var Assembler = {
    * Label references are looked up in 'labels'. Any register reference, or reference to a label
    * that's not in 'labels' will be an error.
    */
-  evalConstant: function(expr, labels) {
+  evalConstant: function(expr, labels, fatal) {
     var logger = expr.state.logger;
     var pos = expr.state.pos;
     var value;
@@ -162,23 +162,23 @@ var Assembler = {
     } else if (expr.label !== undefined) {
       value = labels[expr.label];
       if (value === undefined) {
-        logger(expr.loc, "Unresolvable reference to '" + expr.label + "'", true);
+        if (fatal) logger(expr.loc, "Unresolvable reference to '" + expr.label + "'", true);
         return false;
       }
     } else if (expr.register !== undefined) {
       logger(expr.loc, "Constant expressions may not contain register references", true);
       return false;
     } else if (expr.unary !== undefined) {
-      value = this.evalConstant(expr.right, labels);
+      value = this.evalConstant(expr.right, labels, fatal);
       if (!value) return false;
       switch (expr.unary) {
         case '-': { value = -value; break; }
         default: break;
       }
     } else if (expr.binary !== undefined) {
-      var left = this.evalConstant(expr.left, labels);
+      var left = this.evalConstant(expr.left, labels, fatal);
       if (!left) return false;
-      var right = this.evalConstant(expr.right, labels);
+      var right = this.evalConstant(expr.right, labels, fatal);
       if (!right) return false;
       switch (expr.binary) {
         case '+': { value = left + right; break; }
@@ -221,7 +221,7 @@ var Assembler = {
     var state = { text: text, pos: pos, end: text.length, logger: logger };
     var expr = this.parseExpression(state, 0);
     if (expr) {
-      var value = this.evalConstant(expr, labels);
+      var value = this.evalConstant(expr, labels, true);
       if (value) labels[name] = value;
     }
     return true;
@@ -326,7 +326,7 @@ var Assembler = {
   parseArgExpression: function(line, i, logger) {
     var state = { text: line.text, pos: line.arg_locs[i], end: line.arg_ends[i], logger: logger };
     return this.parseExpression(state, 0);
-  }
+  },
 
   handleData: function(info, line, labels, logger) {
     var args = line.args;
@@ -342,7 +342,7 @@ var Assembler = {
       } else {
         var expr = this.parseArgExpression(line, i, logger);
         if (!expr) return false;
-        var value = this.evalConstant(expr, labels);
+        var value = this.evalConstant(expr, labels, true);
         if (!value) return false;
         info.size++;
         info.dump.push(value);
@@ -372,7 +372,7 @@ var Assembler = {
       }
       var expr = this.parseArgExpression(line, 0, logger);
       if (!expr) return false;
-      var value = this.evalConstant(expr, labels);
+      var value = this.evalConstant(expr, labels, true);
       if (!value) return false;
       info.org = value;
       return info;
