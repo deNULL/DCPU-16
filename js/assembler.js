@@ -619,8 +619,8 @@ var Assembler = {
     // try resolving the expression if we can
     var value = state.delay_eval ? false : this.evalConstant(expr, labels, false);
     if (value !== false) {
-      if (!pointer && value < 32 && is_a) {
-        info.code = 0x20 + value;
+      if (!pointer && (value == 0xffff || value < 31) && is_a) {
+        info.code = 0x20 + (value == 0xffff ? 0x00 : (0x01 + value));
       } else {
         info.code = (pointer ? 0x1e : 0x1f);
         info.immediate = value;
@@ -834,15 +834,6 @@ var Assembler = {
       info.dump[0] = opcode | (info.a.code << 4) | ((offset | 0x20) << 10);
       return info;
     }
-    if (info.a !== undefined) {
-      if (info.a.expr !== undefined) {
-        var a = this.resolveOperand(info.a, labels, logger);
-        if (!a) return false;
-        info.a = a;
-        if (a.immediate !== undefined) info.dump[index] = a.immediate;
-      }
-      if (info.a.immediate !== undefined) index++;
-    }
     if (info.b !== undefined) {
       if (info.b.expr !== undefined) {
         var b = this.resolveOperand(info.b, labels, logger);
@@ -851,6 +842,15 @@ var Assembler = {
         if (b.immediate !== undefined) info.dump[index] = b.immediate;
       }
       if (info.b.immediate !== undefined) index++;
+    }
+    if (info.a !== undefined) {
+      if (info.a.expr !== undefined) {
+        var a = this.resolveOperand(info.a, labels, logger);
+        if (!a) return false;
+        info.a = a;
+        if (a.immediate !== undefined) info.dump[index] = a.immediate;
+      }
+      if (info.a.immediate !== undefined) index++;
     }
     return info;
   },

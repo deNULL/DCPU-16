@@ -70,9 +70,9 @@ cycles: 0,
 
 /*
 * Retrieves required value from memory or some of registers
-* (no_change - don't perform any changes on SP or PC)
+* (no_change - don't perform any changes on SP)
 */
-getValue: function(code, memory, registers, no_change) {
+getValue: function(is_a, code, memory, registers, no_change) {
   if (code < 0x8) {
     return registers[DCPU.regs[code]] || 0;
   } else
@@ -85,18 +85,25 @@ getValue: function(code, memory, registers, no_change) {
     DCPU.cycles++;
     return memory[(nw + registers[DCPU.regs[code - 0x10]] || 0) & 0xffff] || 0;
   } else
-  if (code == 0x18) { // POP
-    var v = memory[registers.SP || 0] || 0;
-    if (!no_change) registers.SP = (registers.SP + 1) & 0xffff;
-    return v;
+  if (code == 0x18) { // POP / PUSH
+    if (is_a) {
+      var v = memory[registers.SP || 0] || 0;
+      if (!no_change) registers.SP = (registers.SP + 1) & 0xffff;
+      return v;
+    } else {
+      var v = memory[(registers.SP - 1) & 0xffff] || 0;
+      if (!no_change) registers.SP = (registers.SP - 1) & 0xffff;
+      return v;
+    }
   } else
   if (code == 0x19) { // PEEK
     return memory[registers.SP || 0] || 0;
   } else
-  if (code == 0x1a) { // PUSH
-    var v = memory[(registers.SP - 1) & 0xffff] || 0;
-    if (!no_change) registers.SP = (registers.SP - 1) & 0xffff;
-    return v;
+  if (code == 0x1a) { // PICK n
+    var nw = memory[registers.PC] || 0;
+    registers.PC = (registers.PC + 1) & 0xffff;
+    DCPU.cycles++;
+    return memory[(nw + registers.SP) & 0xffff] || 0;
   } else
   if (code == 0x1b) {
     return registers.SP || 0;
@@ -137,14 +144,15 @@ setValue: function(code, value, memory, registers, cur_registers) {
     var nw = memory[registers.PC];
     memory[(nw + registers[DCPU.regs[code - 0x10]]) & 0xffff] = value;
   } else
-  if (code == 0x18) { // POP
-    memory[registers.SP] = value;
+  if (code == 0x18) { // PUSH (POP can't be set)
+    memory[cur_registers.SP] = value;
   } else
   if (code == 0x19) { // PEEK
     memory[registers.SP] = value;
   } else
-  if (code == 0x1a) { // PUSH
-    memory[cur_registers.SP] = value;
+  if (code == 0x1a) { // PICK n
+    var nw = memory[registers.PC];
+    memory[(nw + registers.SP) & 0xffff] = value;
   } else
   if (code == 0x1b) {
     cur_registers.SP = value;
@@ -164,13 +172,13 @@ setValue: function(code, value, memory, registers, cur_registers) {
 */
 skip: function(memory, registers) {
   var cur = memory[registers.PC] || 0;
-  var op = cur & 0xf;
-  var aa = (cur >> 4) & 0x3f;
-  var bb = (cur >> 10) & 0x3f;
+  var op = cur & 0x1f;
+  var aa = (cur >> 10) & 0x3f;
+  var bb = (cur >> 5) & 0x1f;
   var cycles = DCPU.cycles;
   registers.PC = (registers.PC + 1) & 0xffff;
-  DCPU.getValue(aa, memory, registers, true);
-  DCPU.getValue(bb, memory, registers, true);
+  DCPU.getValue(true, bb, memory, registers, true);
+  DCPU.getValue(true, aa, memory, registers, true);
   DCPU.cycles = cycles;
 },
 /*
@@ -178,9 +186,9 @@ skip: function(memory, registers) {
 */
 step: function(memory, registers) {
   var cur = memory[registers.PC] || 0;
-  var op = cur & 0xf;
-  var aa = (cur >> 4) & 0x3f;
-  var bb = (cur >> 10) & 0x3f;
+  var op = cur & 0x1f;
+  var aa = (cur >> 10) & 0x3f;
+  var bb = (cur >> 5) & 0x1f;
   registers.PC = (registers.PC + 1) & 0xffff;
   var copy = {};
   for (var r in registers)
@@ -193,9 +201,9 @@ step: function(memory, registers) {
   }
   switch (op) {
     case 0x0: {
-      switch (aa) {
+      switch (bb) {
         case 0x1: { // JSR
-          var av = DCPU.getValue(bb, memory, registers);
+          var av = DCPU.getValue(true, aa, memory, registers);
           registers.SP = (registers.SP - 1) & 0xffff;
           memory[registers.SP] = registers.PC;
           registers.PC = av;
@@ -207,80 +215,80 @@ step: function(memory, registers) {
       }
       break;
     }
-    case 0x1: {
-      DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, bv, memory, copy, registers);
+    case 0x1: { // SET
+      DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, bv, memory, copy, registers);
       return DCPU.cycles + 1;
     }
-    case 0x2: {
-      var v = DCPU.getValue(aa, memory, registers) + DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+    case 0x2: { // ADD
+      var v = DCPU.getValue(true, bb, memory, registers) + DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
-    case 0x3: {
-      var v = DCPU.getValue(aa, memory, registers) - DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+    case 0x3: { // SUB
+      var v = DCPU.getValue(true, bb, memory, registers) - DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
-    case 0x4: {
-      var v = DCPU.getValue(aa, memory, registers) * DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+    case 0x4: { // MUL
+      var v = DCPU.getValue(true, bb, memory, registers) * DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x5: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
       if (bv == 0) {
-        DCPU.setValue(aa, 0, memory, copy, registers);
+        DCPU.setValue(bb, 0, memory, copy, registers);
         registers.EX = 0;
       } else {
         var res = av / bv;
-        DCPU.setValue(aa, parseInt(res) & 0xffff, memory, copy, registers);
+        DCPU.setValue(bb, parseInt(res) & 0xffff, memory, copy, registers);
         registers.EX = parseInt(res * 0x10000) & 0xffff;
       }
       return DCPU.cycles + 3;
     }
     case 0x6: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, (bv == 0) ? 0 : (av % bv), memory, copy, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, (bv == 0) ? 0 : (av % bv), memory, copy, registers);
       return DCPU.cycles + 3;
     }
     case 0x7: {
-      var v = DCPU.getValue(aa, memory, registers) << DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+      var v = DCPU.getValue(true, bb, memory, registers) << DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x8: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, (av >> bv) & 0xffff, memory, copy, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, (av >> bv) & 0xffff, memory, copy, registers);
       registers.EX = ((av << 16) >> bv) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x9: {
-      var v = DCPU.getValue(aa, memory, registers) & DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+      var v = DCPU.getValue(true, bb, memory, registers) & DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       return DCPU.cycles + 1;
     }
     case 0xa: {
-      var v = DCPU.getValue(aa, memory, registers) | DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+      var v = DCPU.getValue(true, bb, memory, registers) | DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       return DCPU.cycles + 1;
     }
     case 0xb: {
-      var v = DCPU.getValue(aa, memory, registers) ^ DCPU.getValue(bb, memory, registers);
-      DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
+      var v = DCPU.getValue(true, bb, memory, registers) ^ DCPU.getValue(true, aa, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       return DCPU.cycles + 1;
     }
     case 0xc: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
       if (av != bv) {
         DCPU.skip(memory, registers);
         return DCPU.cycles + 3;
@@ -288,8 +296,8 @@ step: function(memory, registers) {
       return DCPU.cycles + 2;
     }
     case 0xd: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
       if (av == bv) {
         DCPU.skip(memory, registers);
         return DCPU.cycles + 3;
@@ -297,8 +305,8 @@ step: function(memory, registers) {
       return DCPU.cycles + 2;
     }
     case 0xe: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
       if (av <= bv) {
         DCPU.skip(memory, registers);
         return DCPU.cycles + 3;
@@ -306,8 +314,8 @@ step: function(memory, registers) {
       return DCPU.cycles + 2;
     }
     case 0xf: {
-      var av = DCPU.getValue(aa, memory, registers);
-      var bv = DCPU.getValue(bb, memory, registers);
+      var av = DCPU.getValue(true, bb, memory, registers);
+      var bv = DCPU.getValue(true, aa, memory, registers);
       if ((av & bv) == 0) {
         DCPU.skip(memory, registers);
         return DCPU.cycles + 3;
@@ -320,7 +328,7 @@ step: function(memory, registers) {
 
 // -------
 
-disassembleValue: function(code, memory, offset, logger) {
+disassembleValue: function(is_a, code, memory, offset, logger) {
 
   if (code < 0x8) {
     return {size: 0, str: wrapAs(DCPU.regs[code], "reg")};
@@ -337,13 +345,18 @@ disassembleValue: function(code, memory, offset, logger) {
     return {size: 1, str: "[" + wrapAs(DCPU.regs[code - 0x10], "reg") + "+" + wrapAs("0x" + nw.toString(16), "lit") + "]"};
   } else
   if (code == 0x18) { // POP
-    return {size: 0, str: wrapAs("POP", "kw")};
+    return {size: 0, str: wrapAs(is_a ? "PUSH" : "POP", "kw")};
   } else
   if (code == 0x19) { // PEEK
     return {size: 0, str: wrapAs("PEEK", "kw")};
   } else
-  if (code == 0x1a) { // PUSH
-    return {size: 0, str: wrapAs("PUSH", "kw")};
+  if (code == 0x1a) { // PICK
+    if (offset >= memory.length) {
+      logger(offset, "Disassembler reached end of the file", true);
+      return false;
+    }
+    var nw = memory[offset];
+    return {size: 0, str: wrapAs("PICK", "kw") + " " + wrapAs(nw.toString(10), "lit")};
   } else
   if (code == 0x1b) {
     return {size: 0, str: wrapAs("SP", "kw")};
@@ -352,7 +365,7 @@ disassembleValue: function(code, memory, offset, logger) {
     return {size: 0, str: wrapAs("PC", "kw")};
   } else
   if (code == 0x1d) {
-    return {size: 0, str: wrapAs("O", "kw")};
+    return {size: 0, str: wrapAs("EX", "kw")};
   } else
   if (code == 0x1e) {
     if (offset >= memory.length) {
@@ -370,7 +383,7 @@ disassembleValue: function(code, memory, offset, logger) {
     var nw = memory[offset];
     return {size: 1, str: wrapAs("0x" + pad(nw.toString(16), 4), "lit"), literal: nw};
   } else {
-    return {size: 0, str: wrapAs((code - 0x20).toString(10), "lit"), literal: (code - 0x20)};
+    return {size: 0, str: wrapAs((code - 0x21).toString(10), "lit"), literal: (code == 0x20) ? 0xffff : (code - 0x21)};
   }
 },
 /*
@@ -389,15 +402,15 @@ disassemble: function(memory, offset, labels, logger) {
     return {size: 0, terminal: true};
   }
   var cur = memory[offset];
-  var op = cur & 0xf;
-  var aa = (cur >> 4) & 0x3f;
-  var bb = (cur >> 10) & 0x3f;
+  var op = cur & 0x1f;
+  var aa = (cur >> 10) & 0x3f;
+  var bb = (cur >> 5) & 0x1f;
 
   switch (op) {
     case 0x0: {
-      switch (aa) {
+      switch (bb) {
         case 0x1: { // JSR
-          var vb = DCPU.disassembleValue(bb, memory, offset + res.size, logger);
+          var vb = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
           res.size += vb.size;
           res.code = wrapAs("JSR", "op") + " " + vb.str;
           if (vb.literal !== undefined) {
@@ -417,42 +430,42 @@ disassemble: function(memory, offset, labels, logger) {
       }
     }
     default: {
-      var va = DCPU.disassembleValue(aa, memory, offset + res.size, logger);
-      res.size += va.size;
-      var vb = DCPU.disassembleValue(bb, memory, offset + res.size, logger);
+      var vb = DCPU.disassembleValue(false, bb, memory, offset + res.size, logger);
       res.size += vb.size;
+      var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
+      res.size += va.size;
 
-      res.code = wrapAs(DCPU.bops[op], "op") + " " + va.str + ", " + vb.str;
-      if (op >= 0x0c && op <= 0x0f) {
+      res.code = wrapAs(DCPU.bops[op], "op") + " " + vb.str + ", " + va.str;
+      if (op >= 0x10 && op <= 0x17) {
         res.conditional = true;
       } else
-      if (aa == 0x1c) {
+      if (bb == 0x1c) {
         offset += res.size;
         res.terminal = true;
-        if (vb.literal === undefined) {
-          if (bb != 0x18) // assuming SET PC, POP - RET
+        if (va.literal === undefined) {
+          if (aa != 0x18) // assuming SET PC, POP - RET
             logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
         } else
         switch (op) {
           case 0x1: {
-            res.branch = vb.literal;
+            res.branch = va.literal;
             if (!labels[res.branch]) {
               labels.last++;
               labels[res.branch] = "label" + labels.last;
             }
-            res.code = wrapAs(DCPU.bops[op], "op") + " " + va.str + ", " + wrapAs(labels[res.branch], "lbl");
+            res.code = wrapAs(DCPU.bops[op], "op") + " " + vb.str + ", " + wrapAs(labels[res.branch], "lbl");
             break;
           }
-          case 0x2: { res.branch = (offset + vb.literal) & 0xffff; break; }
-          case 0x3: { res.branch = (offset - vb.literal) & 0xffff; break; }
-          case 0x4: { res.branch = (offset * vb.literal) & 0xffff; break; }
-          case 0x5: { res.branch = parseInt(offset / vb.literal) & 0xffff; break; }
-          case 0x6: { res.branch = (vb.literal == 0) ? 0 : (offset % vb.literal); break; }
-          case 0x7: { res.branch = (offset << vb.literal) & 0xffff; break; }
-          case 0x8: { res.branch = (offset >> vb.literal) & 0xffff; break; }
-          case 0x9: { res.branch = (offset & vb.literal); break; }
-          case 0xa: { res.branch = (offset | vb.literal); break; }
-          case 0xb: { res.branch = (offset ^ vb.literal); break; }
+          case 0x2: { res.branch = (offset + va.literal) & 0xffff; break; }
+          case 0x3: { res.branch = (offset - va.literal) & 0xffff; break; }
+          case 0x4: { res.branch = (offset * va.literal) & 0xffff; break; }
+          case 0x5: { res.branch = parseInt(offset / va.literal) & 0xffff; break; }
+          case 0x6: { res.branch = (va.literal == 0) ? 0 : (offset % va.literal); break; }
+          case 0x7: { res.branch = (offset << va.literal) & 0xffff; break; }
+          case 0x8: { res.branch = (offset >> va.literal) & 0xffff; break; }
+          case 0x9: { res.branch = (offset & va.literal); break; }
+          case 0xa: { res.branch = (offset | va.literal); break; }
+          case 0xb: { res.branch = (offset ^ va.literal); break; }
         }
       }
 
