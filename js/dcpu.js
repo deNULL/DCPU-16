@@ -547,29 +547,42 @@ disassemble: function(memory, offset, labels, logger) {
   var bb = (cur >> 5) & 0x1f;
 
   switch (op) {
-    case 0x0: {
+    case 0x00: {
       switch (bb) {
-        case 0x1: { // JSR
-          var vb = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
-          res.size += vb.size;
-          res.code = wrapAs("JSR", "op") + " " + vb.str;
-          if (vb.literal !== undefined) {
-            res.branch = vb.literal;
+        case 0x01:   // JSR
+        case 0x0a: { // IAS
+          var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
+          res.size += va.size;
+          res.code = wrapAs(DCPU.nbops[op], "op") + " " + va.str;
+          if (va.literal !== undefined) {
+            res.branch = va.literal;
             if (!labels[res.branch]) {
               labels.last++;
               labels[res.branch] = "label" + labels.last;
             }
-            res.code = wrapAs("JSR", "op") + " " + wrapAs(labels[res.branch], "lbl");
+            res.code = wrapAs(DCPU.nbops[op], "op") + " " + wrapAs(labels[res.branch], "lbl");
           }
           return res;
         }
         default: {
-          logger(offset, "Unknown instruction: " + aa.toString(16));
-          return {size: 0, terminal: true};
+          if (!DCPU.nbops[op]) {
+            logger(offset, "Unknown non-basic instruction: " + aa.toString(16));
+            return {size: 0, terminal: true};
+          }
+
+          var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
+          res.size += va.size;
+          res.code = wrapAs(DCPU.nbops[op], "op") + " " + va.str;
+          return res;
         }
       }
     }
     default: {
+      if (!DCPU.bops[op]) {
+        logger(offset, "Unknown basic instruction: " + op.toString(16));
+        return {size: 0, terminal: true};
+      }
+
       var vb = DCPU.disassembleValue(false, bb, memory, offset + res.size, logger);
       res.size += vb.size;
       var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
@@ -587,7 +600,8 @@ disassemble: function(memory, offset, labels, logger) {
             logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
         } else
         switch (op) {
-          case 0x1: {
+          case 0x01:
+          case 0x0f: {
             res.branch = va.literal;
             if (!labels[res.branch]) {
               labels.last++;
@@ -596,16 +610,21 @@ disassemble: function(memory, offset, labels, logger) {
             res.code = wrapAs(DCPU.bops[op], "op") + " " + vb.str + ", " + wrapAs(labels[res.branch], "lbl");
             break;
           }
-          case 0x2: { res.branch = (offset + va.literal) & 0xffff; break; }
-          case 0x3: { res.branch = (offset - va.literal) & 0xffff; break; }
-          case 0x4: { res.branch = (offset * va.literal) & 0xffff; break; }
-          case 0x5: { res.branch = parseInt(offset / va.literal) & 0xffff; break; }
-          case 0x6: { res.branch = (va.literal == 0) ? 0 : (offset % va.literal); break; }
-          case 0x7: { res.branch = (offset << va.literal) & 0xffff; break; }
-          case 0x8: { res.branch = (offset >> va.literal) & 0xffff; break; }
-          case 0x9: { res.branch = (offset & va.literal); break; }
-          case 0xa: { res.branch = (offset | va.literal); break; }
-          case 0xb: { res.branch = (offset ^ va.literal); break; }
+          case 0x02: { res.branch = (offset + va.literal) & 0xffff; break; }
+          case 0x03: { res.branch = (offset - va.literal) & 0xffff; break; }
+          case 0x04: { res.branch = (offset * va.literal) & 0xffff; break; }
+          case 0x05: { res.branch = (DCPU.extendSign(offset) * DCPU.extendSign(va.literal)) & 0xffff; break; }
+          case 0x06: { res.branch = parseInt(offset / va.literal) & 0xffff; break; }
+          case 0x07: { res.branch = parseInt(DCPU.extendSign(offset) / DCPU.extendSign(va.literal)) & 0xffff; break; }
+          case 0x08: { res.branch = (va.literal == 0) ? 0 : (offset % va.literal); break; }
+          case 0x09: { res.branch = (offset & va.literal); break; }
+          case 0x0a: { res.branch = (offset | va.literal); break; }
+          case 0x0b: { res.branch = (offset ^ va.literal); break; }
+          case 0x0c: { res.branch = (offset >>> va.literal) & 0xffff; break; }
+          case 0x0d: { res.branch = (DCPU.extendSign(offset) >> va.literal) & 0xffff; break; }
+          case 0x0e: { res.branch = (offset << va.literal) & 0xffff; break; }
+          case 0x1a: { res.branch = (offset + va.literal) & 0xffff; break; }
+          case 0x1b: { res.branch = (offset - va.literal) & 0xffff; break; }
         }
       }
 
