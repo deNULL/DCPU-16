@@ -68,6 +68,13 @@ nbops: {
 regs: ["A", "B", "C", "X", "Y", "Z", "I", "J"],
 cycles: 0,
 
+extendSign: function(word) {
+  if (word & 0x8000) { // negative
+    return (word | 0xffff0000);
+  }
+  return word;
+},
+
 /*
 * Retrieves required value from memory or some of registers
 * (no_change - don't perform any changes on SP)
@@ -126,8 +133,11 @@ getValue: function(is_a, code, memory, registers, no_change) {
     registers.PC = (registers.PC + 1) & 0xffff;
     return nw;
   } else {
-    return code - 0x20;
+    return (code - 0x21) & 0xffff;
   }
+},
+getSignedValue: function(is_a, code, memory, registers, no_change) {
+  return DCPU.extendSign(DCPU.getValue(is_a, code, memory, registers, no_change));
 },
 /*
 * Sets new value to specified place
@@ -183,8 +193,11 @@ skip: function(memory, registers) {
 },
 /*
 * Steps over the next command (at [PC])
+* memory - array of 65536 words, current state of memory
+* registers - object with fields A, B, C... containing current registers state
+* hardware - array of objects with fields "type", "version", "manufacturer" and "interrupt" (a function with two params: memory and registers, returns number of additional cycles to take)
 */
-step: function(memory, registers) {
+step: function(memory, registers, hardware) {
   var cur = memory[registers.PC] || 0;
   var op = cur & 0x1f;
   var aa = (cur >> 10) & 0x3f;
@@ -202,12 +215,53 @@ step: function(memory, registers) {
   switch (op) {
     case 0x0: {
       switch (bb) {
-        case 0x1: { // JSR
+        case 0x01: { // JSR
           var av = DCPU.getValue(true, aa, memory, registers);
           registers.SP = (registers.SP - 1) & 0xffff;
           memory[registers.SP] = registers.PC;
           registers.PC = av;
+          return DCPU.cycles + 3;
+        }
+        // ...
+        case 0x08: { // INT
+          var av = DCPU.getValue(true, aa, memory, registers);
+          if (registers.IA) {
+            registers.SP = (registers.SP - 1) & 0xffff;
+            memory[registers.SP] = registers.PC;
+            registers.SP = (registers.SP - 1) & 0xffff;
+            memory[registers.SP] = registers.A;
+            registers.PC = registers.IA;
+            registers.A = av;
+          }
+          return DCPU.cycles + 4;
+        }
+        case 0x09: { // IAG
+          DCPU.getValue(true, aa, memory, registers);
+          DCPU.setValue(aa, registers.IA || 0, memory, copy, registers);
+          return DCPU.cycles + 1;
+        }
+        case 0x0a: { // IAS
+          registers.IA = DCPU.getValue(true, aa, memory, registers);
+          return DCPU.cycles + 1;
+        }
+        // ...
+        case 0x10: { // HWN
+          DCPU.getValue(true, aa, memory, registers);
+          DCPU.setValue(aa, hardware.length, memory, copy, registers);
           return DCPU.cycles + 2;
+        }
+        case 0x11: { // HWQ
+          var hw = hardware[DCPU.getValue(true, aa, memory, registers)];
+          registers.A = (hw.type >> 16);
+          registers.B = (hw.type & 0xffff);
+          registers.C = hw.revision;
+          registers.X = (hw.manufacturer >> 16);
+          registers.Y = (hw.manufacturer & 0xffff);
+          return DCPU.cycles + 4;
+        }
+        case 0x12: { // HWI
+          var hw = hardware[DCPU.getValue(true, aa, memory, registers)];
+          return DCPU.cycles + hw.interrupt(memory, registers);
         }
         default: {
           return 0;
@@ -215,112 +269,198 @@ step: function(memory, registers) {
       }
       break;
     }
-    case 0x1: { // SET
-      DCPU.getValue(true, bb, memory, registers);
+    case 0x01: { // SET
       var bv = DCPU.getValue(true, aa, memory, registers);
+      DCPU.getValue(true, bb, memory, registers);
       DCPU.setValue(bb, bv, memory, copy, registers);
       return DCPU.cycles + 1;
     }
-    case 0x2: { // ADD
-      var v = DCPU.getValue(true, bb, memory, registers) + DCPU.getValue(true, aa, memory, registers);
+    case 0x02: { // ADD
+      var v = DCPU.getValue(true, aa, memory, registers) + DCPU.getValue(true, bb, memory, registers);
       DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
-    case 0x3: { // SUB
-      var v = DCPU.getValue(true, bb, memory, registers) - DCPU.getValue(true, aa, memory, registers);
+    case 0x03: { // SUB
+      var v = - DCPU.getValue(true, aa, memory, registers) + DCPU.getValue(true, bb, memory, registers);
       DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
-    case 0x4: { // MUL
-      var v = DCPU.getValue(true, bb, memory, registers) * DCPU.getValue(true, aa, memory, registers);
+    case 0x04: { // MUL
+      var v = DCPU.getValue(true, aa, memory, registers) * DCPU.getValue(true, bb, memory, registers);
       DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
-    case 0x5: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      if (bv == 0) {
+    case 0x05: { // MLI
+      var v = DCPU.getSignedValue(true, aa, memory, registers) * DCPU.getSignedValue(true, bb, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
+      registers.EX = (v >> 16) & 0xffff;
+      return DCPU.cycles + 2;
+    }
+    case 0x06: { // DIV
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if (av == 0) {
         DCPU.setValue(bb, 0, memory, copy, registers);
         registers.EX = 0;
       } else {
-        var res = av / bv;
+        var res = bv / av;
         DCPU.setValue(bb, parseInt(res) & 0xffff, memory, copy, registers);
         registers.EX = parseInt(res * 0x10000) & 0xffff;
       }
       return DCPU.cycles + 3;
     }
-    case 0x6: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      DCPU.setValue(bb, (bv == 0) ? 0 : (av % bv), memory, copy, registers);
+    case 0x07: { // DVI
+      var av = DCPU.getSignedValue(true, aa, memory, registers);
+      var bv = DCPU.getSignedValue(true, bb, memory, registers);
+      if (av == 0) {
+        DCPU.setValue(bb, 0, memory, copy, registers);
+        registers.EX = 0;
+      } else {
+        var res = bv / av;
+        DCPU.setValue(bb, parseInt(res) & 0xffff, memory, copy, registers);
+        registers.EX = parseInt(res * 0x10000) & 0xffff;
+      }
       return DCPU.cycles + 3;
     }
-    case 0x7: {
-      var v = DCPU.getValue(true, bb, memory, registers) << DCPU.getValue(true, aa, memory, registers);
+    case 0x08: { // MOD
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, (av == 0) ? 0 : (bv % av), memory, copy, registers);
+      return DCPU.cycles + 3;
+    }
+    case 0x09: { // AND
+      var v = DCPU.getValue(true, aa, memory, registers) & DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
+      return DCPU.cycles + 1;
+    }
+    case 0x0a: { // BOR
+      var v = DCPU.getValue(true, aa, memory, registers) | DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
+      return DCPU.cycles + 1;
+    }
+    case 0x0b: { // XOR
+      var v = DCPU.getValue(true, aa, memory, registers) ^ DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
+      return DCPU.cycles + 1;
+    }
+    case 0x0c: { // SHR
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, (bv >>> av) & 0xffff, memory, copy, registers);
+      registers.EX = ((bv << 16) >>> av) & 0xffff;
+      return DCPU.cycles + 2;
+    }
+    case 0x0d: { // ASR
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getSignedValue(true, bb, memory, registers);
+      DCPU.setValue(bb, (bv >> av) & 0xffff, memory, copy, registers);
+      registers.EX = ((bv << 16) >> av) & 0xffff;
+      return DCPU.cycles + 2;
+    }
+    case 0x0e: { // SHL
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, (bv << av) & 0xffff, memory, copy, registers);
+      registers.EX = ((bv << av) >> 16) & 0xffff;
+      return DCPU.cycles + 2;
+    }
+    case 0x0f: { // MVI
+      var av = DCPU.getValue(true, aa, memory, registers);
+      DCPU.getValue(true, bb, memory, registers);
+      DCPU.setValue(bb, av, memory, copy, registers);
+      registers.I = (registers.I + 1) & 0xffff;
+      registers.J = (registers.J + 1) & 0xffff;
+      return DCPU.cycles + 2;
+    }
+    case 0x10: { // IFB
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if ((bv & av) == 0) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x11: { // IFC
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if ((bv & av) != 0) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x12: { // IFE
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if (bv != av) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x13: { // IFN
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if (bv == av) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x14: { // IFG
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if (bv <= av) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x15: { // IFA
+      var av = DCPU.getSignedValue(true, aa, memory, registers);
+      var bv = DCPU.getSignedValue(true, bb, memory, registers);
+      if (bv <= av) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x16: { // IFL
+      var av = DCPU.getValue(true, aa, memory, registers);
+      var bv = DCPU.getValue(true, bb, memory, registers);
+      if (bv >= av) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+    case 0x17: { // IFU
+      var av = DCPU.getSignedValue(true, aa, memory, registers);
+      var bv = DCPU.getSignedValue(true, bb, memory, registers);
+      if (bv >= av) {
+        DCPU.skip(memory, registers);
+        return DCPU.cycles + 3;
+      }
+      return DCPU.cycles + 2;
+    }
+
+    // ...
+
+    case 0x1a: { // ADX
+      var v = DCPU.getValue(true, aa, memory, registers) + DCPU.getValue(true, bb, memory, registers) + registers.EX;
       DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
       registers.EX = (v >> 16) & 0xffff;
-      return DCPU.cycles + 2;
+      return DCPU.cycles + 3;
     }
-    case 0x8: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      DCPU.setValue(bb, (av >> bv) & 0xffff, memory, copy, registers);
-      registers.EX = ((av << 16) >> bv) & 0xffff;
-      return DCPU.cycles + 2;
-    }
-    case 0x9: {
-      var v = DCPU.getValue(true, bb, memory, registers) & DCPU.getValue(true, aa, memory, registers);
+    case 0x1b: { // SUX
+      var v = -DCPU.getValue(true, aa, memory, registers) + DCPU.getValue(true, bb, memory, registers) + registers.EX;
       DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
-      return DCPU.cycles + 1;
-    }
-    case 0xa: {
-      var v = DCPU.getValue(true, bb, memory, registers) | DCPU.getValue(true, aa, memory, registers);
-      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
-      return DCPU.cycles + 1;
-    }
-    case 0xb: {
-      var v = DCPU.getValue(true, bb, memory, registers) ^ DCPU.getValue(true, aa, memory, registers);
-      DCPU.setValue(bb, v & 0xffff, memory, copy, registers);
-      return DCPU.cycles + 1;
-    }
-    case 0xc: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      if (av != bv) {
-        DCPU.skip(memory, registers);
-        return DCPU.cycles + 3;
-      }
-      return DCPU.cycles + 2;
-    }
-    case 0xd: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      if (av == bv) {
-        DCPU.skip(memory, registers);
-        return DCPU.cycles + 3;
-      }
-      return DCPU.cycles + 2;
-    }
-    case 0xe: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      if (av <= bv) {
-        DCPU.skip(memory, registers);
-        return DCPU.cycles + 3;
-      }
-      return DCPU.cycles + 2;
-    }
-    case 0xf: {
-      var av = DCPU.getValue(true, bb, memory, registers);
-      var bv = DCPU.getValue(true, aa, memory, registers);
-      if ((av & bv) == 0) {
-        DCPU.skip(memory, registers);
-        return DCPU.cycles + 3;
-      }
-      return DCPU.cycles + 2;
+      registers.EX = (v >> 16) & 0xffff;
+      return DCPU.cycles + 3;
     }
   }
 },

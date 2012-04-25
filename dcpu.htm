@@ -327,7 +327,8 @@ echo htmlspecialchars($code);?></textarea>
     <table border=0 class="editor">
     <tr>
       <td class="reg_name">PC:</td><td id="regPC" class="cur_pc">0</td>
-      <td class="reg_name">SP:</td><td id="regSP" class="cur_sp">ffff</td>
+      <td class="reg_name">SP:</td><td id="regSP" class="cur_sp">0</td>
+      <td class="reg_name">IA:</td><td id="regIA" class="cur_ia">0</td>
     </tr> <tr>
       <td class="reg_name">A:</td><td id="regA">0</td>
       <td class="reg_name">B:</td><td id="regB">0</td>
@@ -361,7 +362,7 @@ echo htmlspecialchars($code);?></textarea>
   <script language="javascript">
     var cycles = 0;
     var memory = [];
-    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, EX: 0};
+    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, EX: 0, IA: 0};
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
@@ -486,7 +487,7 @@ echo htmlspecialchars($code);?></textarea>
     }
 
     function step() {
-      var rv = DCPU.step(memory, registers);
+      var rv = DCPU.step(memory, registers, []);
       if (rv > 0) {
         cycles += rv;
       }
@@ -504,7 +505,7 @@ echo htmlspecialchars($code);?></textarea>
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
           for (var i = 0; i < 10000; i++) {
-            var rv = DCPU.step(memory, registers);
+            var rv = DCPU.step(memory, registers, []);
             if (rv < 0) { // break
               if (runningTimer) run(button);
               return;
