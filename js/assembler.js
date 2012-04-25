@@ -792,7 +792,7 @@ var Assembler = {
           state.delay_eval = true;
           opcode = 0;
           a = this.parseOperand(state, labels);
-          if (!b) return false;
+          if (!a) return false;
           b = { code: this.SPECIALS["pc"] };
           // we'll compute the branch on the 2nd pass.
           info.branch_from = org + 1;
@@ -817,12 +817,12 @@ var Assembler = {
     var index = 1;
     if (info.branch_from) {
       // finally resolve relative branch
-      info.b.short = false;
-      var dest = this.resolveOperand(info.b, labels, logger);
+      info.a.short = false;
+      var dest = this.resolveOperand(info.a, labels, logger);
       if (!dest) return false;
       var offset = info.branch_from - dest.immediate;
-      if (offset < -31 || offset > 31) {
-        logger(0, "Branch can't move this far away (limit: 31 words)", true);
+      if (offset < -30 || offset > 30) {
+        logger(0, "Branch can't move this far away (limit: 30 words)", true);
         return false;
       }
       if (offset < 0) {
@@ -831,7 +831,7 @@ var Assembler = {
       } else {
         opcode = this.OP_BINARY["sub"];
       }
-      info.dump[0] = opcode | (info.a.code << 4) | ((offset | 0x20) << 10);
+      info.dump[0] = ((offset + 0x21) << 10) | (info.b.code << 5) | opcode;
       return info;
     }
     if (info.b !== undefined) {

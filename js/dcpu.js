@@ -553,26 +553,26 @@ disassemble: function(memory, offset, labels, logger) {
         case 0x0a: { // IAS
           var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
           res.size += va.size;
-          res.code = wrapAs(DCPU.nbops[op], "op") + " " + va.str;
+          res.code = wrapAs(DCPU.nbops[bb], "op") + " " + va.str;
           if (va.literal !== undefined) {
             res.branch = va.literal;
             if (!labels[res.branch]) {
               labels.last++;
-              labels[res.branch] = "label" + labels.last;
+              labels[res.branch] = (bb == 0x0a ? "int_handler" : "label") + labels.last;
             }
-            res.code = wrapAs(DCPU.nbops[op], "op") + " " + wrapAs(labels[res.branch], "lbl");
+            res.code = wrapAs(DCPU.nbops[bb], "op") + " " + wrapAs(labels[res.branch], "lbl");
           }
           return res;
         }
         default: {
-          if (!DCPU.nbops[op]) {
+          if (!DCPU.nbops[bb]) {
             logger(offset, "Unknown non-basic instruction: " + aa.toString(16));
             return {size: 0, terminal: true};
           }
 
           var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
           res.size += va.size;
-          res.code = wrapAs(DCPU.nbops[op], "op") + " " + va.str;
+          res.code = wrapAs(DCPU.nbops[bb], "op") + " " + va.str;
           return res;
         }
       }
