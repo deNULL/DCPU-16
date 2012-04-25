@@ -1,7 +1,9 @@
 <html>
 <head>
   <title>DCPU-16 emulator</title>
+  <script type="text/javascript" src="assembler.js"></script>
   <script type="text/javascript" src="js/dcpu.js"></script>
+  <script type="text/javascript" src="screen.js"></script>
   <style>
     body, button {
       font-family: Verdana, Tahoma, sans-serif;
@@ -153,49 +155,6 @@
       background-color: black;
       padding: 4px;
     }
-    #screen u, #screen b {
-      display: inline-block;
-      width: 9px;
-      height: 19px;
-      text-decoration: none;
-      font-weight: normal;
-    }
-    #screen .f0 {color: #000000;}
-    #screen .f1 {color: #0000aa;}
-    #screen .f2 {color: #00aa00;}
-    #screen .f3 {color: #00aaaa;}
-    #screen .f4 {color: #aa0000;}
-    #screen .f5 {color: #aa00aa;}
-    #screen .f6 {color: #aa5500;}
-    #screen .f7 {color: #aaaaaa;}
-    #screen .f8 {color: #555555;}
-    #screen .f9 {color: #5555ff;}
-    #screen .fa {color: #55ff55;}
-    #screen .fb {color: #55ffff;}
-    #screen .fc {color: #ff5555;}
-    #screen .fd {color: #ff55ff;}
-    #screen .fe {color: #ffff55;}
-    #screen .ff {color: #ffffff;}
-
-    #screen .b0 {background-color: #000000;}
-    #screen .b1 {background-color: #0000aa;}
-    #screen .b2 {background-color: #00aa00;}
-    #screen .b3 {background-color: #00aaaa;}
-    #screen .b4 {background-color: #aa0000;}
-    #screen .b5 {background-color: #aa00aa;}
-    #screen .b6 {background-color: #aa5500;}
-    #screen .b7 {background-color: #aaaaaa;}
-    #screen .b8 {background-color: #555555;}
-    #screen .b9 {background-color: #5555ff;}
-    #screen .ba {background-color: #55ff55;}
-    #screen .bb {background-color: #55ffff;}
-    #screen .bc {background-color: #ff5555;}
-    #screen .bd {background-color: #ff55ff;}
-    #screen .be {background-color: #ffff55;}
-    #screen .bf {background-color: #ffffff;}
-
-    #screen .h {visibility: hidden;}
-
     .notice {
       margin: 6px 0px 10px 0px;
       color: gray;
@@ -259,7 +218,7 @@
     <div id="tab0_wrapper">
     <table width="100%" id="assembler" cellpadding=0 cellspacing=0><tr valign=top>
       <td width="20"><div class="hlight_wrap"><div class="line_highlight" id="hlight1"></div></div><div class="editor" id="linenums"></div></td>
-      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off placeholder="Place your code here"><?php
+      <td width="60%"><div class="hlight_wrap"><div class="line_highlight" id="hlight2"></div></div><textarea class="editor" id="code" onkeyup="assemble()" onchange="assemble()" wrap=off spellcheck="false" placeholder="Place your code here"><?php
 $default_code = <<<EOF
     ; Try some basic stuff
                   SET A, 0x30              ; 7c01 0030
@@ -452,76 +411,7 @@ echo htmlspecialchars($code);?></textarea>
       updateHighlight();
     }
     updateRegisters();
-    var blink = false;
-    var palette = [
-      [0x00, 0x00, 0x00, 0xff],
-      [0x00, 0x00, 0xaa, 0xff],
-      [0x00, 0xaa, 0x00, 0xff],
-      [0x00, 0xaa, 0xaa, 0xff],
-      [0xaa, 0x00, 0x00, 0xff],
-      [0xaa, 0x00, 0xaa, 0xff],
-      [0xaa, 0x55, 0x00, 0xff],
-      [0xaa, 0xaa, 0xaa, 0xff],
-      [0x55, 0x55, 0x55, 0xff],
-      [0x55, 0x55, 0xff, 0xff],
-      [0x55, 0xff, 0x55, 0xff],
-      [0x55, 0xff, 0xff, 0xff],
-      [0xff, 0x55, 0x55, 0xff],
-      [0xff, 0x55, 0xff, 0xff],
-      [0xff, 0xff, 0x55, 0xff],
-      [0xff, 0xff, 0xff, 0xff]
-    ];
-    var ctx = ge('screen').getContext('2d');
-    var image = ctx.createImageData(384, 288);
-    for (var i = 0; i < 384; i++) {
-      for (var j = 0; j < 288; j++) {
-        image.data[(j * 384 + i) * 4 + 3] = 0xff; // set alpha
-      }
-    }
-    var font = [0x000f, 0x0808, 0x080f, 0x0808, 0x08f8, 0x0808, 0x00ff, 0x0808, 0x0808, 0x0808, 0x08ff, 0x0808, 0x00ff, 0x1414, 0xff00, 0xff08, 0x1f10, 0x1714, 0xfc04, 0xf414, 0x1710, 0x1714, 0xf404, 0xf414, 0xff00, 0xf714, 0x1414, 0x1414, 0xf700, 0xf714, 0x1417, 0x1414, 0x0f08, 0x0f08, 0x14f4, 0x1414, 0xf808, 0xf808, 0x0f08, 0x0f08, 0x001f, 0x1414, 0x00fc, 0x1414, 0xf808, 0xf808, 0xff08, 0xff08, 0x14ff, 0x1414, 0x080f, 0x0000, 0x00f8, 0x0808, 0xffff, 0xffff, 0xf0f0, 0xf0f0, 0xffff, 0x0000, 0x0000, 0xffff, 0x0f0f, 0x0f0f, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x2a1c, 0x2a00, 0x083e, 0x0800, 0x4020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e41, 0x3e00, 0x427f, 0x4000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0x4024, 0x0000, 0x0814, 0x2241, 0x1414, 0x1400, 0x4122, 0x1408, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e49, 0x3a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f0c, 0x7300, 0x7f40, 0x4000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e41, 0xbe00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x7f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x0041, 0x7f00, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x447d, 0x4000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x417f, 0x4000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x704c, 0x7000]; // default font by Notch
-    function redrawScreen() {
-      var offs = 0x8000;
-      var sz = 3; // each screen pixel equals to 3 "real" pixels
-      var line_size = (32 * 4 * sz * 4);
-      for (var i = 0; i < 12; i++) {
-        for (var j = 0; j < 32; j++) {
-          var value = memory[offs];
-          var idx = (value & 0x7f) << 1;
-          var blinking = (value & 0x80);
-          var bg_color = palette[(value >> 8) & 0xf];
-          var fg_color = palette[(value >> 12) & 0xf];
-          for (var ax = 0; ax < 4; ax++) {
-            var byte = 0;
-            if (!blinking || !blink) {
-              switch (ax) {
-                case 0: byte = memory[0x8180 + idx] >> 8; break;
-                case 1: byte = memory[0x8180 + idx] & 0xff; break;
-                case 2: byte = memory[0x8181 + idx] >> 8; break;
-                case 3: byte = memory[0x8181 + idx] & 0xff; break;
-              }
-            }
-            var xbase = ((j << 2) + ax) * sz;
-            for (var ay = 0; ay < 8; ay++) {
-              var color = (byte & 1) ? fg_color : bg_color;
-              var ybase = ((i << 3) + ay) * sz;
-              for (var x = 0; x < sz; x++) {
-                for (var y = 0; y < sz; y++) {
-                  var pos = (ybase + y) * line_size + ((xbase + x) << 2);
-                  image.data[pos] = color[0];
-                  image.data[pos + 1] = color[1];
-                  image.data[pos + 2] = color[2];
-                }
-              }
-              byte >>= 1;
-            }
-          }
-          offs++;
-        }
-      }
-      ctx.putImageData(image, 0, 0); // redraw
-      var back_color = palette[memory[0x8280] & 0xf];
-      ge('screen').style.backgroundColor = '#' + pad(back_color[0].toString(16), 2) + pad(back_color[1].toString(16), 2) + pad(back_color[2].toString(16), 2);
-    }
+
     function updateMemoryView() {
       var lns = "";
       var s = "";
@@ -547,8 +437,6 @@ echo htmlspecialchars($code);?></textarea>
       }
       ge("memory_lines").innerHTML = lns;
       ge("memory_view").innerHTML = s;
-
-      redrawScreen();
     }
     updateMemoryView();
     function positionHighlight(line) {
@@ -570,11 +458,8 @@ echo htmlspecialchars($code);?></textarea>
     }
     positionHighlight(-1);
     function reset() {
-      for (var i = 0; i < 0xffff; i++) {
+      for (var i = 0; i <= 0xffff; i++) {
         if (memory[i]) memory[i] = 0;
-      }
-      for (var i = 0; i < 256; i++) {
-        memory[0x8180 + i] = font[i]; // put default font
       }
       for (var reg in registers) {
         registers[reg] = 0;
@@ -582,32 +467,49 @@ echo htmlspecialchars($code);?></textarea>
       registers.SP = 0;
       cycles = 0;
       keypointer = 0;
+      Screen.resetFont(memory);
       assemble();
     }
     var logger = function(offset, msg, fatal) {
       //log.push(pad(line + 1, 5) + ": " + (fatal ? "(Fatal) " : "") + msg);
       if (fatal) clearInterval(runningTimer);
     };
-    function step() {
-      cycles += DCPU.step(memory, registers);
-      updateHighlight();
+
+    function updateViews(show_all) {
+      if (show_all) {
+        updateHighlight();
+        updateMemoryView();
+      }
       updateRegisters();
-      updateMemoryView();
+      Screen.update(memory);
+      document.getElementById("cycles").innerHTML = cycles;
     }
+
+    function step() {
+      var rv = DCPU.step(memory, registers);
+      if (rv > 0) {
+        cycles += rv;
+      }
+      updateViews(true);
+    }
+
     var runningTimer = false;
     function run(button) {
       if (runningTimer) {
         clearInterval(runningTimer);
         runningTimer = false;
         button.innerHTML = "&#8595; Run (F5)";
-        updateHighlight();
-        updateRegisters();
-        updateMemoryView();
+        updateViews(true);
       } else {
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
           for (var i = 0; i < 10000; i++) {
-            cycles += DCPU.step(memory, registers);
+            var rv = DCPU.step(memory, registers);
+            if (rv < 0) { // break
+              if (runningTimer) run(button);
+              return;
+            }
+            cycles += rv;
             if (!runningTimer) return;
             if (breaks[memToLine[registers.PC] - 1]) {
               run(button);
@@ -615,9 +517,7 @@ echo htmlspecialchars($code);?></textarea>
             }
             if (cycles > was_cycles + 5213) break;
           }
-          updateHighlight();
-          updateRegisters();
-          updateMemoryView();
+          updateViews(true);
         }, 50);
         button.innerHTML = "&#215; Stop (F5)";
       }
@@ -633,92 +533,54 @@ echo htmlspecialchars($code);?></textarea>
         s = "0" + s;
       return s;
     }
+
     function assemble() {
-      lastCode = ge("code").value;
-      var lines = lastCode.split("\n");
-      var labels = {};
-      var linenums = [];
-      var offsets = [];
-      var dump = [];
+      var lines = ge("code").value.split("\n");
       var log = [];
-      var aborted = false;
-      var logger = function(line, offset, msg, fatal) {
-        log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
-        if (fatal) aborted = true;
-      };
-      // get values of labels
-      var sp = 0;
-      var last = false;
-      memToLine = {};
-      lineToMem = {};
-      for (var i = 0; i < lines.length && !aborted; i++) {
+
+      var linenums = [];
+      for (var i = 0; i < lines.length; i++) {
         linenums.push("<u id=ln" + i + " onclick='bp(" + i + ")'>" + (i + 1) + "</u>");
       }
+      ge("linenums").innerHTML = linenums.join("");
+
+      var logger = function(line, address, pos, message, fatal) {
+        log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " +
+          (fatal ? "(<span class='fatal'>Fatal</span>) " : "") +
+          message);
+        ge("ln" + line).style.backgroundColor = '#f88';
+      };
       for (var i = 0; i < 0xffff; i++) {
         if (memory[i]) memory[i] = 0;
       }
-      for (var i = 0; i < 256; i++) {
-        memory[0x8180 + i] = font[i]; // put default font
-      }
-      var macros = {};
-      for (var i = 0; i < lines.length && !aborted; i++) {
-        var info = DCPU.compileLine(i, sp, lines[i], false, macros, {}, logger);
-        if (aborted) break;
-        if (info.label) {
-          if (DCPU.reserved.indexOf(info.label.toUpperCase()) >= 0) {
-            logger(i, sp, "\"" + info.label + "\" is reserved keyword, you can't use it as label name", true);
-            break;
-          } else
-          if (labels[info.label]) {
-            logger(i, sp, "Duplicate label \"" + info.label + "\"");
+      Screen.resetFont(memory);
+      var rv = Assembler.compile(lines, memory, logger);
+
+      // map line # to address, and build up offsets/dump
+      memToLine = {};
+      lineToMem = {};
+      var offsets = [];
+      var dump = [];
+      if (rv) {
+        for (var i = 0; i < lines.length; i++) {
+          if (rv.infos[i] === undefined || rv.infos[i].size == 0) {
+            offsets.push("");
+            dump.push("");
+          } else {
+            var info = rv.infos[i];
+            offsets.push(pad(info.pc.toString(16), 4) + ":");
+            lineToMem[i] = info.pc;
+            var s = "";
+            for (var j = 0; j < info.dump.length; j++) {
+              s += pad(info.dump[j].toString(16), 4) + " ";
+              memToLine[info.pc + j] = i + 1;
+            }
+            dump.push(s);
           }
-          labels[info.label] = sp;
         }
-        if (sp + info.max_size > 0xFFFF) {
-          logger(i, sp, "Code is too big (exceeds 128 Kb), not enough memory", true);
-          break;
-        } else
-        if (sp + info.max_size > 0x8000) {
-          logger(i, sp, "Code is too big (exceeds 64 Kb), overlaps videomemory - there will be glitches on screen)");
-        }
-        if (info.max_size > 0) {
-          lineToMem[i] = sp;
-          offsets.push(pad(sp.toString(16), 4) + ":");
-        } else {
-          offsets.push("");
-        }
-        if (info.org !== undefined) {
-          sp = info.org;
-        } else {
-          sp += info.max_size;
-        }
-      }
-      sp = 0;
-      macros = {};
-      for (var i = 0; i < lines.length && !aborted; i++) {
-        var info = DCPU.compileLine(i, sp, lines[i], labels, macros, {}, logger);
-        if (aborted) break;
-        var s = "";
-        for (var j = 0; j < info.dump.length; j++) {
-          s += pad(info.dump[j].toString(16), 4) + " ";
-          memory[sp + j] = info.dump[j];
-          memToLine[sp + j] = i + 1;
-        }
-        dump.push(s);
-        if (info.org !== undefined) {
-          sp = info.org;
-        } else {
-          sp += info.max_size;
-        }
-        if (info.op) last = info;
-      }
-      if (aborted) {
-        offsets = [];
-        dump = [];
       }
 
       // update UI
-      ge("linenums").innerHTML = linenums.join("");
       ge("offsets").innerHTML = offsets.join("<br/>");
       ge("dump").innerHTML = dump.join("<br/>");
       ge("log").innerHTML = log.join("<br/>");
@@ -730,10 +592,9 @@ echo htmlspecialchars($code);?></textarea>
         } else
           ge("ln" + line).className = breaks[line] ? "breakpoint" : "";
       }
-      updateMemoryView();
-      updateHighlight();
-      updateRegisters();
+      updateViews(true);
     }
+
     function disassemble() {
       lastInput = ge("da_input").value;
       var input = lastInput + " ";
@@ -801,8 +662,7 @@ echo htmlspecialchars($code);?></textarea>
         if (code[i] !== undefined) {
           lines.push(pad(i.toString(16), 4) + ":");
           output.push("&nbsp;&nbsp;" + code[i]);
-        } else
-        if (!used[i]) {
+        } else if (!used[i]) {
           var words = [];
           var all_zeros = true;
           var old_i = i;
@@ -844,13 +704,15 @@ echo htmlspecialchars($code);?></textarea>
       disassemble();
       toggleTab(1);
     }
+
+    Screen.init();
     disassemble();
     reset();
     var lastCode = ge("code").value;
     var lastInput = ge("da_input").value;
     setInterval(function() {
-      blink = !blink;
-      redrawScreen();
+      Screen.blink = !Screen.blink;
+      Screen.update(memory);
 
       var code = ge("code").value;
       if (code != lastCode) {
