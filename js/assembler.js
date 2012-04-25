@@ -663,11 +663,11 @@ var Assembler = {
       line.args.push("pc");
       line.arg_locs.push(0);
       line.arg_ends.push(2);
-      return this.compileLine("set pc, " + line.args[0], org, labels, logger);
+      return this.compileLine("set pc, " + line.args[0], org, labels, macros, subst, logger);
     } else if (info.op == "brk") {
-      return this.compileLine("sub pc, 1", org, labels, logger);
+      return this.compileLine("sub pc, 1", org, labels, macros, subst, logger);
     } else if (info.op == "ret") {
-      return this.compileLine("set pc, pop", org, labels, logger);
+      return this.compileLine("set pc, pop", org, labels, macros, subst, logger);
     }
 
     var opcode, a, b;
