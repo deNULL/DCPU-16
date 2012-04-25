@@ -4,16 +4,66 @@
  */
 
 var Assembler = {
-  DIRECTIVES: [ "macro" ],
-  REGISTERS: [ "a", "b", "c", "x", "y", "z", "i", "j" ],
-  SPECIALS: [ "pop", "peek", "push", "sp", "pc", "o" ],
+  DIRECTIVES: [ "macro", "define" ],
+  REGISTERS: {
+    "a": 0, "b": 1, "c": 2, "x": 3, "y": 4, "z": 5, "i": 6, "j": 7 },
+  SPECIALS: {
+    "push": 0x18,
+    "pop":  0x18,
+    "peek": 0x19,
+    "pick": 0x1a,
+    "sp":   0x1b,
+    "pc":   0x1c,
+    "o":    0x1d, // deprecated
+    "ex":   0x1d
+  },
   BINARY: { '*': 2, '/': 2, '%': 2, '+': 1, '-': 1 },
 
-  OP_BINARY: [ "set", "add", "sub", "mul", "div", "mod", "shl", "shr",
-               "and", "bor", "xor", "ife", "ifn", "ifg", "ifb" ],
-  OP_SPECIAL: [ "jsr" ],
-  OP_RESERVED: [ "set", "add", "sub", "mul", "div", "mod", "shl", "shr",
-               "and", "bor", "xor", "ife", "ifn", "ifg", "ifb", "jsr", "dat", "org"],
+  OP_BINARY:   {
+    "set": 0x01,
+    "add": 0x02,
+    "sub": 0x03,
+    "mul": 0x04,
+    "mli": 0x05,
+    "div": 0x06,
+    "dvi": 0x07,
+    "mod": 0x08,
+    "and": 0x09,
+    "bor": 0x0a,
+    "xor": 0x0b,
+    "shr": 0x0c,
+    "asr": 0x0d,
+    "shl": 0x0e,
+    "mvi": 0x0f,
+    "ifb": 0x10,
+    "ifc": 0x11,
+    "ife": 0x12,
+    "ifn": 0x13,
+    "ifg": 0x14,
+    "ifa": 0x15,
+    "ifl": 0x16,
+    "ifu": 0x17,
+    // ...
+    "adx": 0x1a,
+    "sux": 0x1b
+  },
+  OP_SPECIAL: {
+    "jsr": 0x01,
+    // ...
+    "int": 0x08,
+    "iag": 0x09,
+    "ias": 0x0a,
+    // ...
+    "hwn": 0x10,
+    "hwq": 0x11,
+    "hwi": 0x12
+  },
+  OP_RESERVED: [ "set", "add", "sub", "mul", "mli", "div", "dvi", "mod",
+                 "and", "bor", "xor", "shr", "asr", "shl", "mvi",
+                 "ifb", "ifc", "ife", "ifn", "ifg", "ifa", "ifl", "ifu",
+                 "adx", "sux",
+                 "jsr", "int", "iag", "ias", "hwn", "hwq", "hwi",
+                 "jmp", "brk", "ret", "bra", "dat", "org" ],
 
   SPACE: { ' ': true, '\n': true, '\r': true, '\t': true }, // to replace charAt(pos).match(/\s/), using regexps is very slow
 
@@ -33,6 +83,7 @@ var Assembler = {
     var text = state.text;
     var pos = state.pos;
     var end = state.end;
+    var subst = state.subst;
     var logger = state.logger;
 
     while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
@@ -61,13 +112,16 @@ var Assembler = {
         return false;
       }
       operand = operand[0].toLowerCase();
+      if (subst[operand]) {
+        operand = subst[operand];
+      }
       pos += operand.length;
       if (operand.match(/^[0-9]+$/g)) {
         atom.literal = parseInt(operand, 10);
       } else if (operand.match(/^0x[0-9a-fA-F]+$/g)) {
         atom.literal = parseInt(operand, 16);
-      } else if (this.REGISTERS.indexOf(operand) > -1) {
-        atom.register = this.REGISTERS.indexOf(operand);
+      } else if (this.REGISTERS[operand] !== undefined) {
+        atom.register = this.REGISTERS[operand];
       } else if (operand.match(/^[a-zA-Z_.][a-zA-Z_.0-9]*$/)) {
         atom.label = operand;
       }
@@ -166,7 +220,7 @@ var Assembler = {
     if (expr.literal !== undefined) {
       value = expr.literal;
     } else if (expr.label !== undefined) {
-      if (this.SPECIALS.indexOf(expr.label) > -1) {
+      if (this.SPECIALS[expr.label] !== undefined) {
         logger(pos, "You can't use " + expr.label.toUpperCase() + " in expressions.", true);
         return false;
       }
@@ -251,7 +305,7 @@ var Assembler = {
   parseLine: function(text, macros, subst, logger) {
     var pos = 0;
     var end = text.length;
-    var line = { text: text, pos: pos, end: end };
+    var line = { text: text, pos: pos, end: end, args: [] };
 
     // strip comments so we don't have to worry about them
     var in_string = false;
@@ -274,7 +328,7 @@ var Assembler = {
     if (text.charAt(pos) == ":") {
       // label
       pos++;
-      line.label = text.substr(pos, end - pos).match(/^[a-z_.][a-z_.0-9]*/);
+      line.label = text.substr(pos, end - pos).match(/^[a-zA-Z_.][a-zA-Z_.0-9]*/);
       if (!line.label || line.label[0].length == 0) {
         logger(pos, "Label name must contain only latin characters, underscore, dot or digits.", true);
         return false;
@@ -291,7 +345,7 @@ var Assembler = {
       pos++;
       line.directive = text.substr(pos, end - pos).match(/^[a-zA-Z]*/);
       if (!line.directive || this.DIRECTIVES.indexOf(line.directive[0].toLowerCase()) < 0) {
-        logger(pos, "Unknown directive: #" + info.directive[0], true);
+        logger(pos, "Unknown directive: #" + line.directive[0], true);
         return false;
       }
       line.directive = line.directive[0].toLowerCase();
@@ -304,7 +358,7 @@ var Assembler = {
         // #macro directive
         line.macro = text.substr(pos, end - pos).match(/^[^ (]*/);
         if (!line.macro || line.macro[0].length == 0 || this.OP_RESERVED.indexOf(line.macro[0].toLowerCase()) > -1) {
-          logger(pos, "Invalid macro name: " + info.macro[0], true);
+          logger(pos, "Invalid macro name: " + line.macro[0], true);
           return false;
         }
         line.macro = line.macro[0].toLowerCase();
@@ -330,39 +384,50 @@ var Assembler = {
         if (line.macro_params.length > 0 && line.macro_params[0] == "") {
           line.macro_params.pop();
         }
+        return line;
+      } else
+      if (line.directive == "define") {
+        line.define = text.substr(pos, end - pos).match(/^[a-zA-Z_.][a-zA-Z_.0-9]*/);
+        if (!line.define || line.define[0].length == 0) {
+          logger(pos, "#define name must contain only latin characters, underscore, dot or digits.", true);
+          return false;
+        }
+        line.define = line.define[0].toLowerCase();
+        pos += line.define.length;
+        while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+        if (pos >= end) return line;
       }
-      return line;
-    }
-
-    if (text.charAt(pos) == "{") {
-      line.start_block = true;
-      pos++;
-    }
-    if (text.charAt(pos) == "}") {
-      line.end_block = true;
-      pos++;
-    }
-    while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
-    if (pos >= end) return line;
-
-    var word = text.substr(pos, end - pos).match(/^[^ (]+/);
-    if (!word) {
-      logger(pos, "Inscrutable opcode", true);
-      return false;
-    }
-    line.op = word[0].toLowerCase();
-    pos += line.op.length;
-
-    while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
-    while (pos < end && this.SPACE[text.charAt(end - 1)]) end--;
-    if (subst[line.op] !== undefined) {
-      line.op = subst[line.op];
-    }
-    var macro_nm = macros[line.op];
-    if (macro_nm && macro_nm.length) {
-      if (pos < end - 1 && text.charAt(pos) == '(' && text.charAt(end) == ')') {
+    } else {
+      if (text.charAt(pos) == "{") {
+        line.start_block = true;
         pos++;
-        end--;
+      }
+      if (text.charAt(pos) == "}") {
+        line.end_block = true;
+        pos++;
+      }
+      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+      if (pos >= end) return line;
+
+      var word = text.substr(pos, end - pos).match(/^[^ (]+/);
+      if (!word) {
+        logger(pos, "Inscrutable opcode", true);
+        return false;
+      }
+      line.op = word[0].toLowerCase();
+      pos += line.op.length;
+
+      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+      while (pos < end && this.SPACE[text.charAt(end - 1)]) end--;
+      if (subst[line.op] !== undefined) {
+        line.op = subst[line.op];
+      }
+      var macro_nm = macros[line.op];
+      if (macro_nm && macro_nm.length) {
+        if (pos < end - 1 && text.charAt(pos) == '(' && text.charAt(end - 1) == ')') {
+          pos++;
+          end--;
+        }
       }
     }
 
@@ -402,11 +467,6 @@ var Assembler = {
       logger(pos, "Expected '\"' before end of line", true);
       return false;
     }
-    for (var i = 0; i < args.length; i++) {
-      if (subst[args[i]] !== undefined) {
-        args[i] = subst[args[i]];
-      }
-    }
     line.args = args;
     line.arg_locs = arg_locs;
     line.arg_ends = arg_ends;
@@ -440,11 +500,11 @@ var Assembler = {
     return rv;
   },
 
-  stateFromArg: function(line, i, logger) {
-    return { text: line.text, pos: line.arg_locs[i], end: line.arg_ends[i], logger: logger };
+  stateFromArg: function(is_a, line, i, subst, logger) {
+    return { text: line.text, is_a: is_a, pos: line.arg_locs[i], end: line.arg_ends[i], subst: subst, logger: logger };
   },
 
-  handleData: function(info, line, labels, logger) {
+  handleData: function(info, line, labels, subst, logger) {
     var args = line.args;
     for (var i = 0; i < args.length; i++) {
       var arg = args[i];
@@ -456,7 +516,7 @@ var Assembler = {
           info.dump.push(arg.charCodeAt(j));
         }
       } else {
-        var expr = this.parseExpression(this.stateFromArg(line, i, logger), 0);
+        var expr = this.parseExpression(this.stateFromArg(true, line, i, subst, logger), 0);
         if (!expr) return false;
         var value = this.evalConstant(expr, labels, true);
         if (value === false) return false;
@@ -478,6 +538,8 @@ var Assembler = {
     var text = state.text;
     var pos = state.pos;
     var end = state.end;
+    var logger = state.logger;
+    var is_a = state.is_a;
     var info = { };
 
     var pointer = false;
@@ -491,20 +553,42 @@ var Assembler = {
       state.end--;
     }
 
+    var pick = false;
+    if (end - pos >= 4 && state.text.substr(pos, 4).toLowerCase() == "pick") {
+      pick = true;
+      state.pos += 4;
+      while (state.pos < state.end && this.SPACE[state.text.charAt(state.pos)]) state.pos++;
+    }
+
     var expr = this.parseExpression(state);
     if (!expr) return false;
 
-    // simple cases: register, special mode
+    // simple cases: register, special mode, PICK n
+    if (pick) {
+      var value = this.evalConstant(expr, labels, false);
+      info.code = 0x1a;
+      if (value !== false) {
+        info.immediate = value;
+      } else {
+        info.immediate = 0;
+        info.expr = expr;
+      }
+      return info;
+    }
     if (expr.register !== undefined) {
       info.code = (pointer ? 0x08 : 0x00) + expr.register;
       return info;
     }
-    if (expr.label !== undefined && this.SPECIALS.indexOf(expr.label) >= 0  ) {
+    if (expr.label !== undefined && this.SPECIALS[expr.label] !== undefined ) {
       if (pointer) {
         logger(state.pos, "You can't use a pointer to " + expr.label, true);
         return false;
       }
-      info.code = 0x18 + this.SPECIALS.indexOf(expr.label);
+      if ((is_a && expr.label == "push") || (!is_a && expr.label == "pop")) {
+        logger(state.pos, "You can't use " + wrapAs(expr.label.toUpperCase(), "kw") + " here", true);
+        return false;
+      }
+      info.code = this.SPECIALS[expr.label];
       return info;
     }
 
@@ -535,7 +619,7 @@ var Assembler = {
     // try resolving the expression if we can
     var value = state.delay_eval ? false : this.evalConstant(expr, labels, false);
     if (value !== false) {
-      if (!pointer && value < 32) {
+      if (!pointer && value < 32 && is_a) {
         info.code = 0x20 + value;
       } else {
         info.code = (pointer ? 0x1e : 0x1f);
@@ -612,6 +696,19 @@ var Assembler = {
       return info;
     }
 
+    if (line.define) {
+      if (line.args.length != 1) {
+        logger(0, "#define requires a single value", true);
+        return false;
+      }
+      var expr = this.parseExpression(this.stateFromArg(true, line, 0, subst, logger), 0);
+      if (!expr) return false;
+      var value = this.evalConstant(expr, labels, true);
+      if (value === false) return false;
+      labels[line.define] = value;
+      return info;
+    }
+
     if (info.op === undefined) {
       return info;
     }
@@ -639,14 +736,14 @@ var Assembler = {
       return info;
     }
     if (info.op == "dat") {
-      return this.handleData(info, line, labels, logger);
+      return this.handleData(info, line, labels, subst, logger);
     }
     if (info.op == "org") {
       if (line.args.length != 1) {
         logger(0, "ORG requires a single value", true);
         return false;
       }
-      var expr = this.parseExpression(this.stateFromArg(line, 0, logger), 0);
+      var expr = this.parseExpression(this.stateFromArg(true, line, 0, subst, logger), 0);
       if (!expr) return false;
       var value = this.evalConstant(expr, labels, true);
       if (value === false) return false;
@@ -663,46 +760,44 @@ var Assembler = {
       line.args.push("pc");
       line.arg_locs.push(0);
       line.arg_ends.push(2);
-      return this.compileLine("set pc, " + line.args[0], org, labels, logger);
+      return this.compileLine("set pc, " + line.args[0], org, labels, macros, subst, logger);
     } else if (info.op == "brk") {
-      return this.compileLine("sub pc, 1", org, labels, logger);
+      return this.compileLine("sub pc, 1", org, labels, macros, subst, logger);
     } else if (info.op == "ret") {
-      return this.compileLine("set pc, pop", org, labels, logger);
+      return this.compileLine("set pc, pop", org, labels, macros, subst, logger);
     }
 
     var opcode, a, b;
-    var i = this.OP_BINARY.indexOf(info.op);
-    if (i >= 0) {
+    if (this.OP_BINARY[info.op]) {
       if (line.args.length != 2) {
-        logger(0, "Basic instruction " + info.op + " requires 2 values", true);
+        logger(0, "Basic instruction " + wrapAs(info.op.toUpperCase(), "op") + " requires 2 values", true);
         return false;
       }
-      opcode = i + 1;
-      b = this.parseOperand(this.stateFromArg(line, 1, logger), labels);
-      a = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
+      opcode = this.OP_BINARY[info.op];
+      a = this.parseOperand(this.stateFromArg(true, line, 1, subst, logger), labels);
+      b = this.parseOperand(this.stateFromArg(false, line, 0, subst, logger), labels);
     } else {
-      i = this.OP_SPECIAL.indexOf(info.op);
-      if (i >= 0) {
+      if (this.OP_SPECIAL[info.op]) {
         if (line.args.length != 1) {
-          logger(0, "Non-basic instruction " + info.op + " requires 1 value", true);
+          logger(0, "Non-basic instruction " + wrapAs(info.op.toUpperCase(), "op") + " requires 1 value", true);
           return false;
         }
         opcode = 0;
-        b = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
-        a = { code: i + 1 };
+        a = this.parseOperand(this.stateFromArg(true, line, 0, subst, logger), labels);
+        b = { code: this.OP_SPECIAL[info.op] };
       } else {
         if (info.op == "bra") {
-          var state = this.stateFromArg(line, 0, logger);
+          var state = this.stateFromArg(true, line, 0, subst, logger);
           state.short = true;
           state.delay_eval = true;
           opcode = 0;
-          b = this.parseOperand(state, labels);
+          a = this.parseOperand(state, labels);
           if (!b) return false;
-          a = { code: 0x18 + this.SPECIALS.indexOf("pc") };
+          b = { code: this.SPECIALS["pc"] };
           // we'll compute the branch on the 2nd pass.
           info.branch_from = org + 1;
         } else {
-          logger(0, "Unknown instruction: " + info.op, true);
+          logger(0, "Unknown instruction: " + wrapAs(info.op.toUpperCase(), "op"), true);
           return false;
         }
       }
@@ -710,9 +805,9 @@ var Assembler = {
 
     if (!a || !b) return false;
     info.size = 1 + (a.immediate !== undefined ? 1 : 0) + (b.immediate !== undefined ? 1 : 0);
-    info.dump.push(opcode | (a.code << 4) | (b.code << 10));
-    if (a.immediate !== undefined) info.dump.push(a.immediate);
+    info.dump.push((a.code << 10) | (b.code << 5) | opcode);
     if (b.immediate !== undefined) info.dump.push(b.immediate);
+    if (a.immediate !== undefined) info.dump.push(a.immediate);
     info.a = a;
     info.b = b;
     return info;
@@ -731,10 +826,10 @@ var Assembler = {
         return false;
       }
       if (offset < 0) {
-        opcode = this.OP_BINARY.indexOf("add") + 1;
+        opcode = this.OP_BINARY["add"];
         offset = -offset;
       } else {
-        opcode = this.OP_BINARY.indexOf("sub") + 1;
+        opcode = this.OP_BINARY["sub"];
       }
       info.dump[0] = opcode | (info.a.code << 4) | ((offset | 0x20) << 10);
       return info;

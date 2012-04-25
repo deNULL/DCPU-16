@@ -26,13 +26,46 @@ function ge(e) {
 }
 
 var DCPU = {
-bops: ["SET", "ADD", "SUB", "MUL", "DIV", "MOD", "SHL", "SHR", "AND", "BOR", "XOR", "IFE", "IFN", "IFG", "IFB"],
-cond: ["IFE", "IFN", "IFG", "IFB"],
-nbops: ["JSR"],
+bops: {
+  0x01: "SET",
+  0x02: "ADD",
+  0x03: "SUB",
+  0x04: "MUL",
+  0x05: "MLI",
+  0x06: "DIV",
+  0x07: "DVI",
+  0x08: "MOD",
+  0x09: "AND",
+  0x0a: "BOR",
+  0x0b: "XOR",
+  0x0c: "SHR",
+  0x0d: "ASR",
+  0x0e: "SHL",
+  0x0f: "MVI",
+  0x10: "IFB",
+  0x11: "IFC",
+  0x12: "IFE",
+  0x13: "IFN",
+  0x14: "IFG",
+  0x15: "IFA",
+  0x16: "IFL",
+  0x17: "IFU",
+  // ...
+  0x1a: "ADX",
+  0x1b: "SUX"
+},
+nbops: {
+  0x01: "JSR",
+  // ...
+  0x08: "INT",
+  0x09: "IAG",
+  0x0a: "IAS",
+  // ...
+  0x10: "HWN",
+  0x11: "HWQ",
+  0x12: "HWI"
+},
 regs: ["A", "B", "C", "X", "Y", "Z", "I", "J"],
-add_vals: ["POP", "PEEK", "PUSH", "SP", "PC", "O"],
-reserved: ["A", "B", "C", "X", "Y", "Z", "I", "J", "POP", "PEEK", "PUSH", "SP", "PC", "O"],
-reserved_ops: ["SET", "ADD", "SUB", "MUL", "DIV", "MOD", "SHL", "SHR", "AND", "BOR", "XOR", "IFE", "IFN", "IFG", "IFB", "JSR", "DAT", "ORG"],
 cycles: 0,
 
 /*
@@ -72,7 +105,7 @@ getValue: function(code, memory, registers, no_change) {
     return registers.PC || 0;
   } else
   if (code == 0x1d) {
-    return registers.O || 0;
+    return registers.EX || 0;
   } else
   if (code == 0x1e) {
     var nw = memory[registers.PC] || 0;
@@ -120,7 +153,7 @@ setValue: function(code, value, memory, registers, cur_registers) {
     cur_registers.PC = value;
   } else
   if (code == 0x1d) {
-    cur_registers.O = value;
+    cur_registers.EX = value;
   } else
   if (code == 0x1e) {
     memory[memory[registers.PC]] = value;
@@ -183,19 +216,19 @@ step: function(memory, registers) {
     case 0x2: {
       var v = DCPU.getValue(aa, memory, registers) + DCPU.getValue(bb, memory, registers);
       DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
-      registers.O = (v >> 16) & 0xffff;
+      registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x3: {
       var v = DCPU.getValue(aa, memory, registers) - DCPU.getValue(bb, memory, registers);
       DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
-      registers.O = (v >> 16) & 0xffff;
+      registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x4: {
       var v = DCPU.getValue(aa, memory, registers) * DCPU.getValue(bb, memory, registers);
       DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
-      registers.O = (v >> 16) & 0xffff;
+      registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x5: {
@@ -203,11 +236,11 @@ step: function(memory, registers) {
       var bv = DCPU.getValue(bb, memory, registers);
       if (bv == 0) {
         DCPU.setValue(aa, 0, memory, copy, registers);
-        registers.O = 0;
+        registers.EX = 0;
       } else {
         var res = av / bv;
         DCPU.setValue(aa, parseInt(res) & 0xffff, memory, copy, registers);
-        registers.O = parseInt(res * 0x10000) & 0xffff;
+        registers.EX = parseInt(res * 0x10000) & 0xffff;
       }
       return DCPU.cycles + 3;
     }
@@ -220,14 +253,14 @@ step: function(memory, registers) {
     case 0x7: {
       var v = DCPU.getValue(aa, memory, registers) << DCPU.getValue(bb, memory, registers);
       DCPU.setValue(aa, v & 0xffff, memory, copy, registers);
-      registers.O = (v >> 16) & 0xffff;
+      registers.EX = (v >> 16) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x8: {
       var av = DCPU.getValue(aa, memory, registers);
       var bv = DCPU.getValue(bb, memory, registers);
       DCPU.setValue(aa, (av >> bv) & 0xffff, memory, copy, registers);
-      registers.O = ((av << 16) >> bv) & 0xffff;
+      registers.EX = ((av << 16) >> bv) & 0xffff;
       return DCPU.cycles + 2;
     }
     case 0x9: {
@@ -389,7 +422,7 @@ disassemble: function(memory, offset, labels, logger) {
       var vb = DCPU.disassembleValue(bb, memory, offset + res.size, logger);
       res.size += vb.size;
 
-      res.code = wrapAs(DCPU.bops[op - 1], "op") + " " + va.str + ", " + vb.str;
+      res.code = wrapAs(DCPU.bops[op], "op") + " " + va.str + ", " + vb.str;
       if (op >= 0x0c && op <= 0x0f) {
         res.conditional = true;
       } else
@@ -407,7 +440,7 @@ disassemble: function(memory, offset, labels, logger) {
               labels.last++;
               labels[res.branch] = "label" + labels.last;
             }
-            res.code = wrapAs(DCPU.bops[op - 1], "op") + " " + va.str + ", " + wrapAs(labels[res.branch], "lbl");
+            res.code = wrapAs(DCPU.bops[op], "op") + " " + va.str + ", " + wrapAs(labels[res.branch], "lbl");
             break;
           }
           case 0x2: { res.branch = (offset + vb.literal) & 0xffff; break; }

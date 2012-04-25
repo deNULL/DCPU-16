@@ -166,21 +166,21 @@
     #tab1_wrapper {
       display: none;
     }
-    #da_code .op {
+    #da_code .op, #log .op {
       font-weight: bold;
       color: #700;
     }
-    #da_code .reg {
+    #da_code .reg, #log .reg {
       font-weight: bold;
       color: #070;
     }
-    #da_code .lit {
+    #da_code .lit, #log .lit {
       color: #007;
     }
-    #da_code .kw {
+    #da_code .kw, #log .kw {
       color: #077;
     }
-    #da_code .lbl {
+    #da_code .lbl, #log .lbl {
       color: #707;
     }
     .tabs {
@@ -340,7 +340,7 @@ echo htmlspecialchars($code);?></textarea>
       <td class="reg_name">I:</td><td id="regI">0</td>
       <td class="reg_name">J:</td><td id="regJ">0</td>
     </tr> <tr>
-      <td class="reg_name">O:</td><td id="regO">0</td>
+      <td class="reg_name">EX:</td><td id="regEX">0</td>
     </tr>
     </table>
 
@@ -361,7 +361,7 @@ echo htmlspecialchars($code);?></textarea>
   <script language="javascript">
     var cycles = 0;
     var memory = [];
-    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, O: 0};
+    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, EX: 0};
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
