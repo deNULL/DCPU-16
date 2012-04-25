@@ -182,9 +182,9 @@ var Assembler = {
       }
     } else if (expr.binary !== undefined) {
       var left = this.evalConstant(expr.left, labels, fatal);
-      if (!left) return false;
+      if (left === false) return false;
       var right = this.evalConstant(expr.right, labels, fatal);
-      if (!right) return false;
+      if (right === false) return false;
       switch (expr.binary) {
         case '+': { value = left + right; break; }
         case '-': { value = left - right; break; }
@@ -420,7 +420,7 @@ var Assembler = {
       }
       info.code = 0x10 + expr.right.register;
       var address = this.evalConstant(expr.left, labels, false);
-      if (address) {
+      if (address !== false) {
         info.immediate = address;
       } else {
         info.immediate = 0;
