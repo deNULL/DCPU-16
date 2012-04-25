@@ -5,9 +5,9 @@ var Screen = {
   revision: 0x1802,
   manufacturer: 0x1c6c8b36,
 
-  MAP_SCREEN: 0x8000, // should be 0 by default, this for backward compatability
-  MAP_FONT:   0x8180, // should be 0 by default, this for backward compatability
-  MAP_PALETTE: 0,
+  MAP_SCREEN:   0,
+  MAP_FONT:     0,
+  MAP_PALETTE:  0,
   BORDER_COLOR: 0,
 
   DISPLAY_WIDTH: 128,
@@ -86,10 +86,10 @@ var Screen = {
     var idx = this.MAP_SCREEN;
     if (idx == 0) {
       ge('loading_overlay').style.display = 'block';
+      return;
     } else {
       if ((new Date()).getTime() - startup > 2000)
-      ge('loading_overlay').style.display = 'none';
-      return;
+        ge('loading_overlay').style.display = 'none';
     }
     var palette = this.defaultPalette;
     if (this.MAP_PALETTE > 0) {

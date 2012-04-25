@@ -481,6 +481,10 @@ echo htmlspecialchars($code);?></textarea>
       registers.SP = 0;
       cycles = 0;
       keypointer = 0;
+      Screen.MAP_SCREEN = 0x8000; // for backward compatability... will be reset to 0 in future
+      Screen.MAP_FONT = 0x8180;
+      Screen.MAP_PALETTE = 0;
+      Screen.BORDER_COLOR = 0;
       Screen.resetFont(memory);
       assemble();
     }

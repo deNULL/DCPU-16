@@ -806,8 +806,8 @@ var Assembler = {
     if (!a || !b) return false;
     info.size = 1 + (a.immediate !== undefined ? 1 : 0) + (b.immediate !== undefined ? 1 : 0);
     info.dump.push((a.code << 10) | (b.code << 5) | opcode);
-    if (b.immediate !== undefined) info.dump.push(b.immediate);
     if (a.immediate !== undefined) info.dump.push(a.immediate);
+    if (b.immediate !== undefined) info.dump.push(b.immediate);
     info.a = a;
     info.b = b;
     return info;
@@ -834,15 +834,6 @@ var Assembler = {
       info.dump[0] = ((offset + 0x21) << 10) | (info.b.code << 5) | opcode;
       return info;
     }
-    if (info.b !== undefined) {
-      if (info.b.expr !== undefined) {
-        var b = this.resolveOperand(info.b, labels, logger);
-        if (!b) return false;
-        info.b = b;
-        if (b.immediate !== undefined) info.dump[index] = b.immediate;
-      }
-      if (info.b.immediate !== undefined) index++;
-    }
     if (info.a !== undefined) {
       if (info.a.expr !== undefined) {
         var a = this.resolveOperand(info.a, labels, logger);
@@ -851,6 +842,15 @@ var Assembler = {
         if (a.immediate !== undefined) info.dump[index] = a.immediate;
       }
       if (info.a.immediate !== undefined) index++;
+    }
+    if (info.b !== undefined) {
+      if (info.b.expr !== undefined) {
+        var b = this.resolveOperand(info.b, labels, logger);
+        if (!b) return false;
+        info.b = b;
+        if (b.immediate !== undefined) info.dump[index] = b.immediate;
+      }
+      if (info.b.immediate !== undefined) index++;
     }
     return info;
   },
