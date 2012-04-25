@@ -370,6 +370,7 @@ var Assembler = {
    *   - code: 5-bit value for the operand in an opcode
    *   - immediate: (optional) if the opcode has an immediate word attached
    *   - expr: if the operand expression can't be evaluated yet (needs to wait for the 2nd pass)
+   * If 'short' is set in state, then the operand must fit into the opcode.
    */
   parseOperand: function(state, labels) {
     var text = state.text;
@@ -430,7 +431,7 @@ var Assembler = {
     }
 
     // try resolving the expression if we can
-    var value = this.evalConstant(expr, labels, false);
+    var value = state.delay_eval ? false : this.evalConstant(expr, labels, false);
     if (value !== false) {
       if (!pointer && value < 32) {
         info.code = 0x20 + value;
@@ -440,9 +441,15 @@ var Assembler = {
       }
     } else {
       // save it for the second pass.
-      info.code = (pointer ? 0x1e : 0x1f);
-      info.immediate = 0;
-      info.expr = expr;
+      if (state.short) {
+        info.code = 0;
+        info.short = true;
+        info.expr = expr;
+      } else {
+        info.code = (pointer ? 0x1e : 0x1f);
+        info.immediate = 0;
+        info.expr = expr;
+      }
     }
     return info;
   },
@@ -452,8 +459,16 @@ var Assembler = {
    */
   resolveOperand: function(info, labels, logger) {
     var value = this.evalConstant(info.expr, labels, true);
-    if (!value) return false;
-    info.immediate = value;
+    if (value === false) return false;
+    if (info.short) {
+      if (value >= 32) {
+        logger(0, "Operand must be < 32", true);
+        return false;
+      }
+      info.code = 0x20 + value;
+    } else {
+      info.immediate = value;
+    }
     info.expr = undefined;
     return info;
   },
@@ -516,17 +531,30 @@ var Assembler = {
       a = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
     } else {
       i = this.OP_SPECIAL.indexOf(info.op);
-      if (i < 0) {
-        logger(0, "Unknown instruction: " + info.op, true);
-        return false;
+      if (i >= 0) {
+        if (line.args.length != 1) {
+          logger(0, "Non-basic instruction " + info.op + " requires 1 value", true);
+          return false;
+        }
+        opcode = 0;
+        b = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
+        a = { code: i + 1 };
+      } else {
+        if (info.op == "bra") {
+          var state = this.stateFromArg(line, 0, logger);
+          state.short = true;
+          state.delay_eval = true;
+          opcode = 0;
+          b = this.parseOperand(state, labels);
+          if (!b) return false;
+          a = { code: 0x18 + this.SPECIALS.indexOf("pc") };
+          // we'll compute the branch on the 2nd pass.
+          info.branch_from = org + 1;
+        } else {
+          logger(0, "Unknown instruction: " + info.op, true);
+          return false;
+        }
       }
-      if (line.args.length != 1) {
-        logger(0, "Non-basic instruction " + info.op + " requires 1 value", true);
-        return false;
-      }
-      opcode = 0;
-      b = this.parseOperand(this.stateFromArg(line, 0, logger), labels);
-      a = { code: i + 1 };
     }
 
     if (!a || !b) return false;
@@ -541,17 +569,36 @@ var Assembler = {
 
   resolveLine: function(info, labels, logger) {
     var index = 1;
+    if (info.branch_from) {
+      // finally resolve relative branch
+      info.b.short = false;
+      var dest = this.resolveOperand(info.b, labels, logger);
+      if (!dest) return false;
+      var offset = info.branch_from - dest.immediate;
+      if (offset < -31 || offset > 31) {
+        logger(0, "Branch can't move this far away (limit: 31 words)", true);
+        return false;
+      }
+      if (offset < 0) {
+        opcode = this.OP_BINARY.indexOf("add") + 1;
+        offset = -offset;
+      } else {
+        opcode = this.OP_BINARY.indexOf("sub") + 1;
+      }
+      info.dump[0] = opcode | (info.a.code << 4) | ((offset | 0x20) << 10);
+      return info;
+    }
     if (info.a !== undefined && info.a.expr !== undefined) {
       var a = this.resolveOperand(info.a, labels, logger);
       if (!a) return false;
       info.a = a;
-      info.dump[index++] = a.immediate;
+      if (!info.a.short) info.dump[index++] = a.immediate;
     }
     if (info.b !== undefined && info.b.expr !== undefined) {
       var b = this.resolveOperand(info.b, labels, logger);
       if (!b) return false;
       info.b = b;
-      info.dump[index++] = b.immediate;
+      if (!info.b.short) info.dump[index++] = b.immediate;
     }
     return info;
   },
