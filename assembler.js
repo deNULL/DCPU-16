@@ -601,7 +601,7 @@ var Assembler = {
     for (var i = 0; i < lines.length && !aborted; i++) {
       if (infos[i] === undefined) continue;
       var l_logger = function(pos, text, fatal) {
-        logger(i + 1, pc, pos, text, fatal);
+        logger(i, pc, pos, text, fatal);
         if (fatal) aborted = true;
       };
       infos[i] = this.resolveLine(infos[i], labels, l_logger);
