@@ -1,8 +1,7 @@
 /*
-*  DCPU-16 Assembler & Emulator Library
-*  by deNULL (me@denull.ru)
-*
-*/
+ *  DCPU-16 Assembler & Emulator Library
+ *  by deNULL (me@denull.ru)
+ */
 
 // some common functions, shouldn't actually be here...
 String.prototype.trim = function() {
@@ -206,7 +205,7 @@ step: function(memory, registers, hardware) {
   DCPU.cycles = 0;
 
   // check for BRK (SUB PC, 1)
-  if (cur == 0x85c3) {
+  if (cur == 0x8b83) {
     return -1;
   }
   switch (op) {
@@ -461,176 +460,5 @@ step: function(memory, registers, hardware) {
     }
   }
 },
-
-
-// -------
-
-disassembleValue: function(is_a, code, memory, offset, logger) {
-
-  if (code < 0x8) {
-    return {size: 0, str: wrapAs(DCPU.regs[code], "reg")};
-  } else
-  if (code < 0x10) {
-    return {size: 0, str: "[" + wrapAs(DCPU.regs[code - 0x08], "reg") + "]"};
-  } else
-  if (code < 0x18) {
-    if (offset >= memory.length) {
-      logger(offset, "Disassembler reached end of the file", true);
-      return false;
-    }
-    var nw = memory[offset];
-    return {size: 1, str: "[" + wrapAs(DCPU.regs[code - 0x10], "reg") + "+" + wrapAs("0x" + nw.toString(16), "lit") + "]"};
-  } else
-  if (code == 0x18) { // POP
-    return {size: 0, str: wrapAs(is_a ? "POP" : "PUSH", "kw")};
-  } else
-  if (code == 0x19) { // PEEK
-    return {size: 0, str: wrapAs("PEEK", "kw")};
-  } else
-  if (code == 0x1a) { // PICK
-    if (offset >= memory.length) {
-      logger(offset, "Disassembler reached end of the file", true);
-      return false;
-    }
-    var nw = memory[offset];
-    return {size: 0, str: wrapAs("PICK", "kw") + " " + wrapAs(nw.toString(10), "lit")};
-  } else
-  if (code == 0x1b) {
-    return {size: 0, str: wrapAs("SP", "kw")};
-  } else
-  if (code == 0x1c) {
-    return {size: 0, str: wrapAs("PC", "kw")};
-  } else
-  if (code == 0x1d) {
-    return {size: 0, str: wrapAs("EX", "kw")};
-  } else
-  if (code == 0x1e) {
-    if (offset >= memory.length) {
-      logger(offset, "Disassembler reached end of the file", true);
-      return false;
-    }
-    var nw = memory[offset];
-    return {size: 1, str: "[" + wrapAs("0x" + pad(nw.toString(16), 4), "lit") + "]"};
-  } else
-  if (code == 0x1f) {
-    if (offset >= memory.length) {
-      logger(offset, "Disassembler reached end of the file");
-      return false;
-    }
-    var nw = memory[offset];
-    return {size: 1, str: wrapAs("0x" + pad(nw.toString(16), 4), "lit"), literal: nw};
-  } else {
-    return {size: 0, str: wrapAs((code - 0x21).toString(10), "lit"), literal: (code == 0x20) ? 0xffff : (code - 0x21)};
-  }
-},
-/*
-* Disassembles code in memory at specified offset
-*
-* Returns object with fields
-* - code
-* - branch
-* - terminal
-* - size
-*/
-disassemble: function(memory, offset, labels, logger) {
-  var res = {size: 1};
-  if (offset >= memory.length) {
-    logger(offset, "Disassembler reached end of the file");
-    return {size: 0, terminal: true};
-  }
-  var cur = memory[offset];
-  var op = cur & 0x1f;
-  var aa = (cur >> 10) & 0x3f;
-  var bb = (cur >> 5) & 0x1f;
-
-  switch (op) {
-    case 0x00: {
-      switch (bb) {
-        case 0x01:   // JSR
-        case 0x0a: { // IAS
-          var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
-          res.size += va.size;
-          res.code = wrapAs(DCPU.nbops[bb], "op") + " " + va.str;
-          if (va.literal !== undefined) {
-            res.branch = va.literal;
-            if (!labels[res.branch]) {
-              labels.last++;
-              labels[res.branch] = (bb == 0x0a ? "int_handler" : "label") + labels.last;
-            }
-            res.code = wrapAs(DCPU.nbops[bb], "op") + " " + wrapAs(labels[res.branch], "lbl");
-          }
-          return res;
-        }
-        default: {
-          if (!DCPU.nbops[bb]) {
-            logger(offset, "Unknown non-basic instruction: " + aa.toString(16));
-            return {size: 0, terminal: true};
-          }
-
-          var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
-          res.size += va.size;
-          res.code = wrapAs(DCPU.nbops[bb], "op") + " " + va.str;
-          return res;
-        }
-      }
-    }
-    default: {
-      if (!DCPU.bops[op]) {
-        logger(offset, "Unknown basic instruction: " + op.toString(16));
-        return {size: 0, terminal: true};
-      }
-
-      var vb = DCPU.disassembleValue(false, bb, memory, offset + res.size, logger);
-      res.size += vb.size;
-      var va = DCPU.disassembleValue(true, aa, memory, offset + res.size, logger);
-      res.size += va.size;
-
-      res.code = wrapAs(DCPU.bops[op], "op") + " " + vb.str + ", " + va.str;
-      if (op >= 0x10 && op <= 0x17) {
-        res.conditional = true;
-      } else
-      if (bb == 0x1c) {
-        offset += res.size;
-        res.terminal = true;
-        if (va.literal === undefined) {
-          if (aa != 0x18) // assuming SET PC, POP - RET
-            logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
-        } else
-        switch (op) {
-          case 0x01:
-          case 0x0f: {
-            res.branch = va.literal;
-            if (!labels[res.branch]) {
-              labels.last++;
-              labels[res.branch] = "label" + labels.last;
-            }
-            res.code = wrapAs(DCPU.bops[op], "op") + " " + vb.str + ", " + wrapAs(labels[res.branch], "lbl");
-            break;
-          }
-          case 0x02: { res.branch = (offset + va.literal) & 0xffff; break; }
-          case 0x03: { res.branch = (offset - va.literal) & 0xffff; break; }
-          case 0x04: { res.branch = (offset * va.literal) & 0xffff; break; }
-          case 0x05: { res.branch = (DCPU.extendSign(offset) * DCPU.extendSign(va.literal)) & 0xffff; break; }
-          case 0x06: { res.branch = parseInt(offset / va.literal) & 0xffff; break; }
-          case 0x07: { res.branch = parseInt(DCPU.extendSign(offset) / DCPU.extendSign(va.literal)) & 0xffff; break; }
-          case 0x08: { res.branch = (va.literal == 0) ? 0 : (offset % va.literal); break; }
-          case 0x09: { res.branch = (offset & va.literal); break; }
-          case 0x0a: { res.branch = (offset | va.literal); break; }
-          case 0x0b: { res.branch = (offset ^ va.literal); break; }
-          case 0x0c: { res.branch = (offset >>> va.literal) & 0xffff; break; }
-          case 0x0d: { res.branch = (DCPU.extendSign(offset) >> va.literal) & 0xffff; break; }
-          case 0x0e: { res.branch = (offset << va.literal) & 0xffff; break; }
-          case 0x1a: { res.branch = (offset + va.literal) & 0xffff; break; }
-          case 0x1b: { res.branch = (offset - va.literal) & 0xffff; break; }
-        }
-      }
-
-      return res;
-    }
-  }
-}
-
-
-
 
 };

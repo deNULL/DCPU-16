@@ -5,8 +5,7 @@
 
 var Assembler = {
   DIRECTIVES: [ "macro", "define" ],
-  REGISTERS: {
-    "a": 0, "b": 1, "c": 2, "x": 3, "y": 4, "z": 5, "i": 6, "j": 7 },
+  REGISTERS: { "a": 0, "b": 1, "c": 2, "x": 3, "y": 4, "z": 5, "i": 6, "j": 7 },
   SPECIALS: {
     "push": 0x18,
     "pop":  0x18,
@@ -271,7 +270,7 @@ var Assembler = {
    * Returns true if this line did contain some constant definition (even if it was an error),
    * meaning you shouldn't bother compiling this line.
    */
-  parseConstant: function(text, labels, logger) {
+  parseConstant: function(text, labels, subst, logger) {
     var match = text.match(/^\s*([A-Za-z_.][A-Za-z0-9_.]*)\s*=\s*(\S+)/);
     if (!match) return false;
     var name = match[1].toLowerCase();
@@ -284,7 +283,7 @@ var Assembler = {
     // manually find position of expression, for displaying nice error messages.
     var pos = text.indexOf('=') + 1;
     while (this.SPACE[text.charAt(pos)]) pos++;
-    var state = { text: text, pos: pos, end: text.length, logger: logger };
+    var state = { text: text, pos: pos, end: text.length, subst: subst, logger: logger };
     var expr = this.parseExpression(state, 0);
     if (expr) {
       var value = this.evalConstant(expr, labels, true);
@@ -876,8 +875,8 @@ var Assembler = {
         if (fatal) aborted = true;
       };
       labels["."] = pc;
-      if (!this.parseConstant(lines[i], labels, l_logger)) {
-        var info = this.compileLine(lines[i], pc, labels, macros, {}, l_logger);
+      if (!this.parseConstant(lines[i], labels, { }, l_logger)) {
+        var info = this.compileLine(lines[i], pc, labels, macros, { }, l_logger);
         if (!info) break;
         if (pc + info.size > 0xffff) {
           l_logger(0, "Code is too big (exceeds 128 KB) &mdash; not enough memory", true);
