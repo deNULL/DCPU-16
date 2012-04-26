@@ -205,7 +205,7 @@ step: function(memory, registers, hardware) {
   DCPU.cycles = 0;
 
   // check for BRK (SUB PC, 1)
-  if (cur == 0x85c3) {
+  if (cur == 0x8b83) {
     return -1;
   }
   switch (op) {
