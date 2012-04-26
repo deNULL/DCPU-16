@@ -2,6 +2,7 @@
 <head>
   <title>DCPU-16 emulator</title>
   <script type="text/javascript" src="js/assembler.js"></script>
+  <script type="text/javascript" src="js/disassembler.js"></script>
   <script type="text/javascript" src="js/dcpu.js"></script>
   <script type="text/javascript" src="js/screen.js"></script>
   <style>
@@ -596,102 +597,69 @@ echo htmlspecialchars($code);?></textarea>
     }
 
     function disassemble() {
-      lastInput = ge("da_input").value;
-      var input = lastInput + " ";
-      var linenum = lastInput.split("\n").length;
-      var data = [];
-      var s = "";
-      for (var i = 0; i < input.length; i++) {
-        if ("0123456789abcdefABCDEF".indexOf(input.charAt(i)) > -1) {
-          s += input.charAt(i);
-          if (s.length == 4) {
-            data.push(parseInt(s, 16));
-            s = "";
-          }
-        }
-      }
+      var lines = ge("code").value.split("\n");
+      var logger = function(line, address, pos, message, fatal) { };
+      var buffer = [ ];
+      var rv = Assembler.compile(lines, buffer, logger);
+      if (!rv) return;
 
-      var log = [];
-      var aborted = false;
-      var logger = function(offset, msg, fatal) {
-        log.push("<span class='line'>" + pad(offset, 4) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
-        if (fatal) aborted = true;
-      };
-
-      var used = {};
-      var code = {};
-      var stack = [];
-      var conditional = false;
-      if (data.length > 0) {
-        stack.push(0);
-      }
-      var labels = {last: 0};
-      while (stack.length > 0) {
-        var pc = stack.pop();
-        if (used[pc]) {
-          continue;
+      // figure out where code is being compiled
+      var code_blocks = [ ];
+      var pc_start = -1;
+      var pc_current = -1;
+      for (var i = 0; i < rv.infos.length; i++) {
+        var info = rv.infos[i];
+        if (info.pc != pc_current) {
+          if (pc_current != -1 && pc_current > pc_start) code_blocks.push({ start: pc_start, end: pc_current });
+          pc_start = info.pc;
+          pc_current = info.pc;
         }
-        do {
-          var info = DCPU.disassemble(data, pc, labels, logger);
-          if (info.branch !== undefined) {
-            stack.push(info.branch);
-          }
-          for (var i = pc; i < pc + info.size; i++) {
-            used[i] = true;
-          }
-          if (info.code !== undefined) {
-            code[pc] = (conditional ? "&nbsp;&nbsp;" : "") + info.code;
-          }
-          pc += info.size;
-          if (conditional) {
-            info.terminal = false;
-          }
-          conditional = info.conditional;
-        } while (pc < data.length && !info.terminal);
+        pc_current += (info.size || 0);
+      }
+      if (pc_current != -1 && pc_current > pc_start) code_blocks.push({ start: pc_start, end: pc_current });
+
+      var targets = [ ];
+      for (var i = 0; i < code_blocks.length; i++) {
+        var t = Disassembler.findTargets(buffer, code_blocks[i].start, code_blocks[i].end);
+        targets = targets.concat(t);
+      }
+      targets.sort();
+      var labels = { };
+      for (var i = 0; i < targets.length; i++) {
+        labels[targets[i]] = "label" + i;
       }
 
       var lines = [];
       var output = [];
-      for (var i = 0; i < data.length; i++) {
-        if (labels[i]) {
-          lines.push("");
-          output.push("");
-          lines.push("");
-          output.push(":" + wrapAs(labels[i], "lbl"));
-        }
-        if (code[i] !== undefined) {
-          lines.push(pad(i.toString(16), 4) + ":");
-          output.push("&nbsp;&nbsp;" + code[i]);
-        } else if (!used[i]) {
-          var words = [];
-          var all_zeros = true;
-          var old_i = i;
-          while (i < data.length && !used[i]) {
-            words.push(wrapAs("0x" + pad(data[i].toString(16), 4), "lit"));
-            if (data[i]) all_zeros = false;
-            i++;
+      var conditional = false;
+      for (var i = 0; i < code_blocks.length; i++) {
+        var pc = code_blocks[i].start;
+        var end = code_blocks[i].end;
+        do {
+          var info = Disassembler.disassemble(buffer, pc, labels, function(type, str) {
+            return "<span class='" + type + "'>" + str + "</span>";
+          });
+          if (labels[pc]) {
+            lines.push("");
+            output.push(":" + wrapAs(labels[pc], "lbl"));
           }
-          if (all_zeros) {
-            if (i < data.length) {
-              lines.push("");
-              lines.push("");
-              output.push("");
-              output.push(wrapAs("ORG", "op") + " " + wrapAs("0x" + pad(i.toString(16), 4), "lit"));
-            }
-          } else {
-            lines.push(pad(old_i.toString(16), 4) + ":");
-            output.push("&nbsp;&nbsp;" + wrapAs("DAT", "op") + " " + words.join(", "));
+          if (info.code !== undefined) {
+            lines.push(pad(pc.toString(16), 4) + ":");
+            output.push("&nbsp;&nbsp;" + (conditional ? "&nbsp;&nbsp;" : "") + info.code);
           }
-          i--;
-        }
+          pc += info.size;
+          conditional = info.conditional;
+        } while (pc < end);
+        lines.push("");
+        output.push("");
       }
 
       // update UI
       ge("da_lines").innerHTML = lines.join("<br/>");
       ge("da_code").innerHTML = output.join("<br/>");
-      ge("log").innerHTML = log.join("<br/>");
-      ge("da_input").style.height = Math.max(560, ((linenum + 1) * 19 + 9)) + "px";
+      ge("da_input").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
     }
+
     function disassembleDump() {
       var dump = "";
       var end = 0x7ffe;
