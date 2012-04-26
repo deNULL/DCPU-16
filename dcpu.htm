@@ -1,10 +1,10 @@
 <html>
 <head>
   <title>DCPU-16 emulator</title>
-  <script type="text/javascript" src="js/assembler.js"></script>
-  <script type="text/javascript" src="js/disassembler.js"></script>
-  <script type="text/javascript" src="js/dcpu.js"></script>
-  <script type="text/javascript" src="js/screen.js"></script>
+  <script type="text/javascript" src="js/assembler.js?v=1"></script>
+  <script type="text/javascript" src="js/disassembler.js?v=1"></script>
+  <script type="text/javascript" src="js/dcpu.js?v=1"></script>
+  <script type="text/javascript" src="js/screen.js?v=1"></script>
   <style>
     body, button {
       font-family: Verdana, Tahoma, sans-serif;
@@ -167,21 +167,21 @@
     #tab1_wrapper {
       display: none;
     }
-    #da_code .op {
+    #da_code .op, #log .op {
       font-weight: bold;
       color: #700;
     }
-    #da_code .reg {
+    #da_code .reg, #log .reg {
       font-weight: bold;
       color: #070;
     }
-    #da_code .lit {
+    #da_code .lit, #log .lit {
       color: #007;
     }
-    #da_code .kw {
+    #da_code .kw, #log .kw {
       color: #077;
     }
-    #da_code .lbl {
+    #da_code .lbl, #log .lbl {
       color: #707;
     }
     .tabs {
@@ -206,6 +206,15 @@
     #disassembleDump {
       float: right;
       margin-top: 19px;
+    }
+    #screen_wrapper {
+      position: relative;
+    }
+    #loading_overlay {
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      margin: 4px;
     }
   </style>
 </head>
@@ -322,13 +331,17 @@ echo htmlspecialchars($code);?></textarea>
     <button onclick="run(this)" id="button_run" class="big"/>&#8595; Run (F5)</button><button onclick="step()"  class="big"/>&#8618; Step (F6)</button><button onclick="reset()" class="big">&#8634; Reset</button><br/>
     <label for="show_pc"><input type="checkbox" id="show_pc" name="show_pc" checked="checked" onchange="toggleShowPC()"/> Show current line</label>
     <h4>Screen:</h4>
-    <canvas id="screen" width="384" height="288"></canvas>
+    <div id="screen_wrapper">
+      <canvas id="screen" width="384" height="288"></canvas>
+      <img id="loading_overlay" src="http://i.imgur.com/DcNzS.png" width="384" height="288"/>
+    </div>
     <div class="notice">Keyboard input is available while the program is running.</div>
     <h4>Registers:</h4>
     <table border=0 class="editor">
     <tr>
       <td class="reg_name">PC:</td><td id="regPC" class="cur_pc">0</td>
-      <td class="reg_name">SP:</td><td id="regSP" class="cur_sp">ffff</td>
+      <td class="reg_name">SP:</td><td id="regSP" class="cur_sp">0</td>
+      <td class="reg_name">IA:</td><td id="regIA" class="cur_ia">0</td>
     </tr> <tr>
       <td class="reg_name">A:</td><td id="regA">0</td>
       <td class="reg_name">B:</td><td id="regB">0</td>
@@ -341,7 +354,7 @@ echo htmlspecialchars($code);?></textarea>
       <td class="reg_name">I:</td><td id="regI">0</td>
       <td class="reg_name">J:</td><td id="regJ">0</td>
     </tr> <tr>
-      <td class="reg_name">O:</td><td id="regO">0</td>
+      <td class="reg_name">EX:</td><td id="regEX">0</td>
     </tr>
     </table>
 
@@ -360,9 +373,10 @@ echo htmlspecialchars($code);?></textarea>
   <div id="log" class="editor"></div></td>
   </tr></table>
   <script language="javascript">
+    var startup = (new Date()).getTime();
     var cycles = 0;
     var memory = [];
-    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, O: 0};
+    var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, EX: 0, IA: 0};
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
@@ -468,6 +482,10 @@ echo htmlspecialchars($code);?></textarea>
       registers.SP = 0;
       cycles = 0;
       keypointer = 0;
+      Screen.MAP_SCREEN = 0x8000; // for backward compatability... will be reset to 0 in future
+      Screen.MAP_FONT = 0x8180;
+      Screen.MAP_PALETTE = 0;
+      Screen.BORDER_COLOR = 0;
       Screen.resetFont(memory);
       assemble();
     }
@@ -487,7 +505,8 @@ echo htmlspecialchars($code);?></textarea>
     }
 
     function step() {
-      var rv = DCPU.step(memory, registers);
+      ge('loading_overlay').style.display = 'none';
+      var rv = DCPU.step(memory, registers, [Screen]);
       if (rv > 0) {
         cycles += rv;
       }
@@ -496,6 +515,7 @@ echo htmlspecialchars($code);?></textarea>
 
     var runningTimer = false;
     function run(button) {
+      ge('loading_overlay').style.display = 'none';
       if (runningTimer) {
         clearInterval(runningTimer);
         runningTimer = false;
@@ -505,7 +525,7 @@ echo htmlspecialchars($code);?></textarea>
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
           for (var i = 0; i < 10000; i++) {
-            var rv = DCPU.step(memory, registers);
+            var rv = DCPU.step(memory, registers, [Screen]);
             if (rv < 0) { // break
               if (runningTimer) run(button);
               return;

@@ -1,10 +1,21 @@
+// Low Energy Monitor LEM1802 (NYA_ELEKTRISKA)
+
 var Screen = {
+  type: 0x7349f615,
+  revision: 0x1802,
+  manufacturer: 0x1c6c8b36,
+
+  MAP_SCREEN:   0,
+  MAP_FONT:     0,
+  MAP_PALETTE:  0,
+  BORDER_COLOR: 0,
+
   DISPLAY_WIDTH: 128,
   DISPLAY_HEIGHT: 96,
   PIXEL_SIZE: 3,
   blink: true,
 
-  palette: [
+  defaultPalette: [
     [0x00, 0x00, 0x00, 0xff],
     [0x00, 0x00, 0xaa, 0xff],
     [0x00, 0xaa, 0x00, 0xff],
@@ -72,16 +83,36 @@ var Screen = {
   },
 
   update: function(memory) {
-    var idx = 0x8000;
+    var idx = this.MAP_SCREEN;
+    if (idx == 0) {
+      ge('loading_overlay').style.display = 'block';
+      return;
+    } else {
+      if ((new Date()).getTime() - startup > 2000)
+        ge('loading_overlay').style.display = 'none';
+    }
+    var palette = this.defaultPalette;
+    if (this.MAP_PALETTE > 0) {
+      palette = [];
+      for (var i = 0; i < 16; i++) {
+        var color = memory[(this.MAP_PALETTE + i) & 0xffff];
+        palette.push([
+          ((color >> 8) & 0xf) << 4,
+          ((color >> 4) & 0xf) << 4,
+          ((color)      & 0xf) << 4,
+          0xff
+        ]);
+      }
+    }
     var line_size = (32 * 4 * this.PIXEL_SIZE * 4);
     for (var y = 0; y < 12; y++) {
       for (var x = 0; x < 32; x++) {
-        var v = memory[idx];
-        var fc = this.palette[(v >> 12) & 0xf];
-        var bc = this.palette[(v >> 8) & 0xf];
+        var v = memory[idx & 0xffff];
+        var fc = palette[(v >> 12) & 0xf];
+        var bc = palette[(v >> 8) & 0xf];
         var cd = (v & 0x7f) << 1;
-        var bt0 = memory[0x8180 + cd];
-        var bt1 = memory[0x8181 + cd];
+        var bt0 = memory[(this.MAP_FONT + cd) & 0xffff];
+        var bt1 = memory[(this.MAP_FONT + cd + 1) & 0xffff];
         var b = (v >> 7) & 1;
 
         for (var ax = 0; ax < 4; ax++) {
@@ -115,7 +146,29 @@ var Screen = {
     }
     this.screen.putImageData(this.image, 0, 0);
 
-    var back_color = this.palette[memory[0x8280] & 0xf];
+    var back_color = palette[this.BORDER_COLOR];
     ge('screen').style.backgroundColor = '#' + pad(back_color[0].toString(16), 2) + pad(back_color[1].toString(16), 2) + pad(back_color[2].toString(16), 2);
+  },
+
+  interrupt: function(memory, registers) {
+    switch (registers.A) {
+      case 0: { // MEM_MAP_SCREEN
+        this.MAP_SCREEN =   registers.B || 0;
+        break;
+      }
+      case 1: { // MEM_MAP_FONT
+        this.MAP_FONT =     registers.B || 0;
+        break;
+      }
+      case 2: { // MEM_MAP_PALETTE
+        this.MAP_PALETTE =  registers.B || 0;
+        break;
+      }
+      case 3: { // SET_BORDER_COLOR
+        this.BORDER_COLOR = registers.B & 0xf;
+        break;
+      }
+    }
+    return 0;
   },
 };
