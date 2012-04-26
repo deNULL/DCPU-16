@@ -380,14 +380,10 @@ echo htmlspecialchars($code);?></textarea>
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
-    // Not final yet! Will most probably change after clarifications from Notch
-    var keymap = {0x0d: 0x0a, 0x25: 0x01, 0x27: 0x02, 0x26: 0x03, 0x28: 0x04};
-    var keypointer = 0;
+
     document.onkeydown = function(event) {
-      var e = event || window.event;
-      var key = e.keyCode;
-      if (keymap[key]) key = keymap[key];
-      switch (key) {
+      var code = window.event ? event.keyCode : event.which;
+      switch (code) {
         case 116: { // F5
           run(ge("button_run"));
           return false;
@@ -397,19 +393,22 @@ echo htmlspecialchars($code);?></textarea>
           return false;
         }
         default: { // pass it to program
-          if (!runningTimer) {
-            return true;
-          }
-          if (!memory[keypointer + 0x9000]) {
-            memory[keypointer + 0x9000] = key;
-            keypointer = (keypointer + 1) % 0x10;
-            updateMemoryView();
-          }
-          return false;
+          if (!runningTimer) return true;
+          return Keyboard.onkeydown(event);
         }
       }
-      return true;
-    }
+    };
+    document.onkeypress = function(event) {
+      if (!runningTimer) return true;
+      if (event.which == 8) { return false; }
+
+      Keyboard.onkeypress(event);
+    };
+    document.onkeyup = function(event) {
+      if (!runningTimer) return true;
+      Keyboard.onkeyup(event);
+    };
+
     function toggleTab(index) {
       for (var i = 0; i < 2; i++) {
         ge("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
@@ -506,7 +505,7 @@ echo htmlspecialchars($code);?></textarea>
 
     function step() {
       ge('loading_overlay').style.display = 'none';
-      var rv = DCPU.step(memory, registers, [Screen]);
+      var rv = DCPU.step(memory, registers, [ Screen, Keyboard ]);
       if (rv > 0) {
         cycles += rv;
       }
@@ -525,7 +524,7 @@ echo htmlspecialchars($code);?></textarea>
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
           for (var i = 0; i < 10000; i++) {
-            var rv = DCPU.step(memory, registers, [Screen]);
+            var rv = DCPU.step(memory, registers, [ Screen, Keyboard ]);
             if (rv < 0) { // break
               if (runningTimer) run(button);
               return;
@@ -629,6 +628,7 @@ echo htmlspecialchars($code);?></textarea>
       var pc_current = -1;
       for (var i = 0; i < rv.infos.length; i++) {
         var info = rv.infos[i];
+        if (info === undefined) continue;
         if (info.pc != pc_current) {
           if (pc_current != -1 && pc_current > pc_start) code_blocks.push({ start: pc_start, end: pc_current });
           pc_start = info.pc;
@@ -694,10 +694,12 @@ echo htmlspecialchars($code);?></textarea>
     }
 
     Screen.init();
+    Keyboard.init();
     disassemble();
     reset();
     var lastCode = ge("code").value;
     var lastInput = ge("da_input").value;
+
     setInterval(function() {
       Screen.blink = !Screen.blink;
       Screen.update(memory);
