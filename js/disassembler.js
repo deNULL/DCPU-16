@@ -52,11 +52,12 @@ var Disassembler = {
     0x12: "HWI"
   },
 
+  address: function(n, labels) {
+    if (labels[n]) return labels[n];
+    return (n > 15) ? ("0x" + pad(n.toString(16), 4)) : n.toString(10);
+  },
+
   decodeValue: function(is_a, code, immediate, labels, wrapAs) {
-    var label = labels[immediate];
-    if (label === undefined && immediate !== undefined) {
-      label = "0x" + pad(immediate.toString(16), 4);
-    }
     if (code < 0x08) {
       return wrapAs("reg", this.REGISTERS[code]);
     } else if (code < 0x10) {
@@ -71,18 +72,15 @@ var Disassembler = {
     } else if (code < 0x1e) {
       return wrapAs("kw", this.SPECIALS[code]);
     } else if (code == 0x1e) {
-      return "[" + wrapAs("lit", label) + "]";
+      return "[" + wrapAs("lit", this.address(immediate, labels)) + "]";
     } else if (code == 0x1f) {
-      return wrapAs("lit", label);
-    } else {
-      var value = (code == 0x20) ? 0xffff : (code - 0x21);
-      var label = labels[value];
-      if (label === undefined) label = (code == 0x20) ? "-1" : value.toString(10);
-      return wrapAs("lit", label);
+      return wrapAs("lit", this.address(immediate, labels));
+    } else { // embedded immediate
+      return wrapAs("lit", this.address(immediate, labels));
     }
   },
 
-  hasImmediate: function(code) {
+  hasArg: function(code) {
     return ((code >= 0x10 && code < 0x18) || code == 0x1a || code == 0x1e || code == 0x1f);
   },
 
@@ -91,14 +89,17 @@ var Disassembler = {
     if (offset >= memory.length) return { op: 0, a: 0, b: 0 };
     var word = memory[offset++];
     var op = { opcode: (word & 0x1f), a: (word >> 10 & 0x3f), b: (word >> 5 & 0x1f) };
-    if (this.hasImmediate(op.b)) {
+    if (this.hasArg(op.b)) {
       if (offset >= memory.length) return { op: 0, a: 0, b: 0 };
       op.b_immediate = memory[offset++];
     }
-    if (this.hasImmediate(op.a)) {
+    if (this.hasArg(op.a)) {
       if (offset >= memory.length) return { op: 0, a: 0, b: 0 };
       op.a_immediate = memory[offset++];
     }
+    // go ahead and decode embedded immediates.
+    if (op.a >= 0x20) op.a_immediate = (op.a == 0x20 ? 0xffff : (op.a - 0x21));
+    if (op.b >= 0x20) op.b_immediate = (op.b == 0x20 ? 0xffff : (op.b - 0x21));
     op.size = offset - start;
     return op;
   },
@@ -109,20 +110,32 @@ var Disassembler = {
   findTargets: function(memory, offset, end) {
     var targets = [ ];
     var jsr = Assembler.OP_SPECIAL["jsr"];
+    var add = Assembler.OP_BINARY["add"];
+    var sub = Assembler.OP_BINARY["sub"];
     var set = Assembler.OP_BINARY["set"];
     var pc = Assembler.SPECIALS["pc"];
     while (offset < end) {
       var op = this.nextOp(memory, offset);
-      if (op.opcode == 0 && op.b == jsr && op.a_immediate !== undefined) {
-        targets.push(op.a_immediate);
-      } else if (op.opcode == 0 && op.b == jsr && op.a >= 0x20) {
-        targets.push(op.a == 0x20 ? 0xffff : (op.a - 0x21));
-      } else if (op.opcode == set && op.b == pc && op.a_immediate !== undefined) {
-        targets.push(op.a_immediate);
-      } else if (op.opcode == set && op.b == pc && op.a >= 0x20) {
-        targets.push(op.a == 0x20 ? 0xffff : (op.a - 0x21));
+      var a = op.a_immediate;
+      var b = op.a_immediate;
+
+      if (op.opcode == 0 && op.b == jsr && a !== undefined) {
+        targets.push(a);
+      } else if (op.opcode == set && op.b == pc && a !== undefined) {
+        targets.push(a);
+      } else if (op.opcode == add && op.b == pc && a !== undefined) {
+        targets.push(offset + op.size + a);
+      } else if (op.opcode == sub && op.b == pc && a !== undefined) {
+        targets.push(offset + op.size - a);
       }
-      offset += op.size;
+
+      if (op.size > 1 && targets.indexOf(offset + 1) >= 0) {
+        offset++;
+      } else if (op.size > 2 && targets.indexOf(offset + 2) >= 0) {
+        offset += 2;
+      } else {
+        offset += op.size;
+      }
     }
     return targets;
   },
@@ -137,7 +150,31 @@ var Disassembler = {
   disassemble: function(memory, offset, labels, wrapAs) {
     var res = { };
     var op = this.nextOp(memory, offset);
+
+    // if this op would stretch into a labeled target, scrap it. it's just data.
+    if ((op.size == 2 && labels[offset + 1]) ||
+        (op.size == 3 && (labels[offset + 1] || labels[offset + 2]))) {
+      res.size = 1;
+      res.code = wrapAs("op", "DAT") + " " + wrapAs("lit", "0x" + pad(memory[offset].toString(16), 4));
+      return res;
+    }
+
     res.size = op.size;
+
+    // for convenience, decode BRA.
+    var add = Assembler.OP_BINARY["add"];
+    var sub = Assembler.OP_BINARY["sub"];
+    var pc = Assembler.SPECIALS["pc"];
+
+    if (op.opcode == add && op.b == pc && op.a_immediate !== undefined) {
+      res.code = wrapAs("op", "BRA") + " " + this.address(offset + op.size + op.a_immediate, labels);
+      return res;
+    }
+    if (op.opcode == sub && op.b == pc && op.a_immediate !== undefined) {
+      res.code = wrapAs("op", "BRA") + " " + this.address(offset + op.size - op.a_immediate, labels);
+      return res;
+    }
+
     var va = this.decodeValue(true, op.a, op.a_immediate, labels, wrapAs);
     var vb = this.decodeValue(false, op.b, op.b_immediate, labels, wrapAs);
 
