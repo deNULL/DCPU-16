@@ -248,10 +248,10 @@ step: function(memory, registers, hardware) {
         }
         case 0x11: { // HWQ
           var hw = hardware[DCPU.getValue(true, aa, memory, registers)];
-          registers.A = (hw.type >> 16);
+          registers.A = (hw.type >> 16) & 0xffff;
           registers.B = (hw.type & 0xffff);
           registers.C = hw.revision;
-          registers.X = (hw.manufacturer >> 16);
+          registers.X = (hw.manufacturer >> 16) & 0xffff;
           registers.Y = (hw.manufacturer & 0xffff);
           return DCPU.cycles + 4;
         }
