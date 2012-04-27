@@ -118,10 +118,10 @@ var Assembler = {
         return false;
       }
       operand = operand[0].toLowerCase();
+      pos += operand.length;
       if (subst[operand]) {
         operand = subst[operand];
       }
-      pos += operand.length;
       if (operand.match(/^[0-9]+$/g)) {
         atom.literal = parseInt(operand, 10);
       } else if (operand.match(/^0x[0-9a-fA-F]+$/g)) {
