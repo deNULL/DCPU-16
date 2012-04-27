@@ -27,13 +27,13 @@ var Assembler = {
     "div": 0x06,
     "dvi": 0x07,
     "mod": 0x08,
-    "and": 0x09,
-    "bor": 0x0a,
-    "xor": 0x0b,
-    "shr": 0x0c,
-    "asr": 0x0d,
-    "shl": 0x0e,
-    "mvi": 0x0f,
+    "mdi": 0x09,
+    "and": 0x0a,
+    "bor": 0x0b,
+    "xor": 0x0c,
+    "shr": 0x0d,
+    "asr": 0x0e,
+    "shl": 0x0f,
     "ifb": 0x10,
     "ifc": 0x11,
     "ife": 0x12,
@@ -44,24 +44,31 @@ var Assembler = {
     "ifu": 0x17,
     // ...
     "adx": 0x1a,
-    "sux": 0x1b
+    "sbx": 0x1b,
+    // ...
+    "sti": 0x1e,
+    "std": 0x1f,
   },
   OP_SPECIAL: {
     "jsr": 0x01,
     // ...
+    "hcf": 0x07,
     "int": 0x08,
     "iag": 0x09,
     "ias": 0x0a,
+    "iap": 0x0b,
+    "iaq": 0x0c,
     // ...
     "hwn": 0x10,
     "hwq": 0x11,
-    "hwi": 0x12
+    "hwi": 0x12,
   },
   OP_RESERVED: [ "set", "add", "sub", "mul", "mli", "div", "dvi", "mod",
-                 "and", "bor", "xor", "shr", "asr", "shl", "mvi",
+                 "mdi", "and", "bor", "xor", "shr", "asr", "shl",
                  "ifb", "ifc", "ife", "ifn", "ifg", "ifa", "ifl", "ifu",
-                 "adx", "sux",
-                 "jsr", "int", "iag", "ias", "hwn", "hwq", "hwi",
+                 "adx", "sbx", "sti", "std",
+                 "jsr", "hcf", "int", "iag", "ias", "iap", "iaq",
+                 "hwn", "hwq", "hwi",
                  "jmp", "brk", "ret", "bra", "dat", "org" ],
 
   SPACE: { ' ': true, '\n': true, '\r': true, '\t': true }, // to replace charAt(pos).match(/\s/), using regexps is very slow

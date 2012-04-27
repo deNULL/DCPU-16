@@ -22,13 +22,13 @@ var Disassembler = {
     0x06: "DIV",
     0x07: "DVI",
     0x08: "MOD",
-    0x09: "AND",
-    0x0a: "BOR",
-    0x0b: "XOR",
-    0x0c: "SHR",
-    0x0d: "ASR",
-    0x0e: "SHL",
-    0x0f: "MVI",
+    0x09: "MDI",
+    0x0a: "AND",
+    0x0b: "BOR",
+    0x0c: "XOR",
+    0x0d: "SHR",
+    0x0e: "ASR",
+    0x0f: "SHL",
     0x10: "IFB",
     0x11: "IFC",
     0x12: "IFE",
@@ -38,18 +38,24 @@ var Disassembler = {
     0x16: "IFL",
     0x17: "IFU",
     0x1A: "ADX",
-    0x1B: "SUX"
+    0x1B: "SBX",
+    // ...
+    0x1E: "STI",
+    0x1F: "STD",
   },
   OP_SPECIAL: {
     0x01: "JSR",
     // ...
+    0x07: "HCF",
     0x08: "INT",
     0x09: "IAG",
     0x0a: "IAS",
+    0x0b: "IAP",
+    0x0c: "IAQ",
     // ...
     0x10: "HWN",
     0x11: "HWQ",
-    0x12: "HWI"
+    0x12: "HWI",
   },
 
   address: function(n, labels) {
