@@ -5,8 +5,7 @@
 
 var Assembler = {
   DIRECTIVES: [ "macro", "define" ],
-  REGISTERS: {
-    "a": 0, "b": 1, "c": 2, "x": 3, "y": 4, "z": 5, "i": 6, "j": 7 },
+  REGISTERS: { "a": 0, "b": 1, "c": 2, "x": 3, "y": 4, "z": 5, "i": 6, "j": 7 },
   SPECIALS: {
     "push": 0x18,
     "pop":  0x18,
@@ -28,13 +27,13 @@ var Assembler = {
     "div": 0x06,
     "dvi": 0x07,
     "mod": 0x08,
-    "and": 0x09,
-    "bor": 0x0a,
-    "xor": 0x0b,
-    "shr": 0x0c,
-    "asr": 0x0d,
-    "shl": 0x0e,
-    "mvi": 0x0f,
+    "mdi": 0x09,
+    "and": 0x0a,
+    "bor": 0x0b,
+    "xor": 0x0c,
+    "shr": 0x0d,
+    "asr": 0x0e,
+    "shl": 0x0f,
     "ifb": 0x10,
     "ifc": 0x11,
     "ife": 0x12,
@@ -45,24 +44,31 @@ var Assembler = {
     "ifu": 0x17,
     // ...
     "adx": 0x1a,
-    "sux": 0x1b
+    "sbx": 0x1b,
+    // ...
+    "sti": 0x1e,
+    "std": 0x1f,
   },
   OP_SPECIAL: {
     "jsr": 0x01,
     // ...
+    "hcf": 0x07,
     "int": 0x08,
     "iag": 0x09,
     "ias": 0x0a,
+    "iap": 0x0b,
+    "iaq": 0x0c,
     // ...
     "hwn": 0x10,
     "hwq": 0x11,
-    "hwi": 0x12
+    "hwi": 0x12,
   },
   OP_RESERVED: [ "set", "add", "sub", "mul", "mli", "div", "dvi", "mod",
-                 "and", "bor", "xor", "shr", "asr", "shl", "mvi",
+                 "mdi", "and", "bor", "xor", "shr", "asr", "shl",
                  "ifb", "ifc", "ife", "ifn", "ifg", "ifa", "ifl", "ifu",
-                 "adx", "sux",
-                 "jsr", "int", "iag", "ias", "hwn", "hwq", "hwi",
+                 "adx", "sbx", "sti", "std",
+                 "jsr", "hcf", "int", "iag", "ias", "iap", "iaq",
+                 "hwn", "hwq", "hwi",
                  "jmp", "brk", "ret", "bra", "dat", "org" ],
 
   SPACE: { ' ': true, '\n': true, '\r': true, '\t': true }, // to replace charAt(pos).match(/\s/), using regexps is very slow
@@ -112,10 +118,10 @@ var Assembler = {
         return false;
       }
       operand = operand[0].toLowerCase();
+      pos += operand.length;
       if (subst[operand]) {
         operand = subst[operand];
       }
-      pos += operand.length;
       if (operand.match(/^[0-9]+$/g)) {
         atom.literal = parseInt(operand, 10);
       } else if (operand.match(/^0x[0-9a-fA-F]+$/g)) {
@@ -271,7 +277,7 @@ var Assembler = {
    * Returns true if this line did contain some constant definition (even if it was an error),
    * meaning you shouldn't bother compiling this line.
    */
-  parseConstant: function(text, labels, logger) {
+  parseConstant: function(text, labels, subst, logger) {
     var match = text.match(/^\s*([A-Za-z_.][A-Za-z0-9_.]*)\s*=\s*(\S+)/);
     if (!match) return false;
     var name = match[1].toLowerCase();
@@ -284,7 +290,7 @@ var Assembler = {
     // manually find position of expression, for displaying nice error messages.
     var pos = text.indexOf('=') + 1;
     while (this.SPACE[text.charAt(pos)]) pos++;
-    var state = { text: text, pos: pos, end: text.length, logger: logger };
+    var state = { text: text, pos: pos, end: text.length, subst: subst, logger: logger };
     var expr = this.parseExpression(state, 0);
     if (expr) {
       var value = this.evalConstant(expr, labels, true);
@@ -482,6 +488,7 @@ var Assembler = {
           case 'n': { rv += "\n"; break; }
           case 'r': { rv += "\r"; break; }
           case 't': { rv += "\t"; break; }
+          case 'z': { rv += "\x00"; break; }
           case 'x': {
             if (i < s.length - 2) {
               rv += String.fromCharCode(parseInt(s.substr(i + 1, 2), 16));
@@ -514,6 +521,26 @@ var Assembler = {
         for (var j = 0; j < arg.length; j++) {
           info.size++;
           info.dump.push(arg.charCodeAt(j));
+        }
+      } else if (arg.charAt(0) == 'p' && arg.charAt(1) == '"') {
+        // packed string
+        arg = this.unquoteString(arg.substr(2, arg.length - 3));
+        var word = 0, in_word = false;
+        for (var j = 0; j < arg.length; j++) {
+          var c = arg.charCodeAt(j);
+          if (in_word) {
+            word |= c;
+            info.size++;
+            info.dump.push(word);
+            in_word = false;
+          } else {
+            word = c << 8;
+            in_word = true;
+          }
+        }
+        if (in_word) {
+          info.size++;
+          info.dump.push(word);
         }
       } else {
         var expr = this.parseExpression(this.stateFromArg(true, line, i, subst, logger), 0);
@@ -876,14 +903,12 @@ var Assembler = {
         if (fatal) aborted = true;
       };
       labels["."] = pc;
-      if (!this.parseConstant(lines[i], labels, l_logger)) {
-        var info = this.compileLine(lines[i], pc, labels, macros, {}, l_logger);
+      if (!this.parseConstant(lines[i], labels, { }, l_logger)) {
+        var info = this.compileLine(lines[i], pc, labels, macros, { }, l_logger);
         if (!info) break;
         if (pc + info.size > 0xffff) {
           l_logger(0, "Code is too big (exceeds 128 KB) &mdash; not enough memory", true);
           break;
-        } else if (pc + info.size > 0x8000) {
-          l_logger(0, "Code is too big (exceeds 64 KB) &mdash; overlaps video memory");
         }
         if (info.org !== undefined) {
           pc = info.org;
