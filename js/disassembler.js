@@ -72,7 +72,7 @@ var Disassembler = {
       return "[" + wrapAs("reg", this.REGISTERS[code - 0x10]) + "+" +
         wrapAs("lit", "0x" + pad(immediate.toString(16), 4)) + "]";
     } else if (code == 0x18) {
-      return wrapAs("kw", is_a ? "PUSH" : "POP");
+      return wrapAs("kw", is_a ? "POP" : "PUSH");
     } else if (code == 0x1a) {
       return wrapAs("kw", "PICK") + " " + wrapAs("lit", immediate.toString(10));
     } else if (code < 0x1e) {
@@ -92,15 +92,15 @@ var Disassembler = {
 
   nextOp: function(memory, offset) {
     var start = offset;
-    if (offset >= memory.length) return { op: 0, a: 0, b: 0 };
+    if (offset >= memory.length) return false;
     var word = memory[offset++];
     var op = { opcode: (word & 0x1f), a: (word >> 10 & 0x3f), b: (word >> 5 & 0x1f) };
     if (this.hasArg(op.b)) {
-      if (offset >= memory.length) return { op: 0, a: 0, b: 0 };
+      if (offset >= memory.length) return false;
       op.b_immediate = memory[offset++];
     }
     if (this.hasArg(op.a)) {
-      if (offset >= memory.length) return { op: 0, a: 0, b: 0 };
+      if (offset >= memory.length) return false;
       op.a_immediate = memory[offset++];
     }
     // go ahead and decode embedded immediates.
@@ -111,90 +111,109 @@ var Disassembler = {
   },
 
   /**
-   * Build a list of memory addresses targeted by JMP/JSR instructions.
-   */
-  findTargets: function(memory, offset, end) {
-    var targets = [ ];
-    var jsr = Assembler.OP_SPECIAL["jsr"];
-    var add = Assembler.OP_BINARY["add"];
-    var sub = Assembler.OP_BINARY["sub"];
-    var set = Assembler.OP_BINARY["set"];
-    var pc = Assembler.SPECIALS["pc"];
-    while (offset < end) {
-      var op = this.nextOp(memory, offset);
-      var a = op.a_immediate;
-      var b = op.a_immediate;
-
-      if (op.opcode == 0 && op.b == jsr && a !== undefined) {
-        targets.push(a);
-      } else if (op.opcode == set && op.b == pc && a !== undefined) {
-        targets.push(a);
-      } else if (op.opcode == add && op.b == pc && a !== undefined) {
-        targets.push(offset + op.size + a);
-      } else if (op.opcode == sub && op.b == pc && a !== undefined) {
-        targets.push(offset + op.size - a);
-      }
-
-      if (op.size > 1 && targets.indexOf(offset + 1) >= 0) {
-        offset++;
-      } else if (op.size > 2 && targets.indexOf(offset + 2) >= 0) {
-        offset += 2;
-      } else {
-        offset += op.size;
-      }
-    }
-    return targets;
-  },
-
-  /**
    * Disassemble a single operation in memory at the specified offset.
    * Returns:
    *   - code: string for displaying
    *   - conditional: if this is a conditional op
+   *   - terminal: if this is a terminal op (any instuctions after it are unreachable and should be treated as data)
+   *   - branch: new possible target
    *   - size: # of words consumed
    */
-  disassemble: function(memory, offset, labels, wrapAs) {
+  disassemble: function(memory, offset, labels, wrapAs, logger) {
     var res = { };
     var op = this.nextOp(memory, offset);
-
-    // if this op would stretch into a labeled target, scrap it. it's just data.
-    if ((op.size == 2 && labels[offset + 1]) ||
-        (op.size == 3 && (labels[offset + 1] || labels[offset + 2]))) {
-      res.size = 1;
-      res.code = wrapAs("op", "DAT") + " " + wrapAs("lit", "0x" + pad(memory[offset].toString(16), 4));
-      return res;
+    if (!op) {
+      logger(offset, "Disassembler reached end of the file");
+      return {size: 0, terminal: true};
     }
 
     res.size = op.size;
 
-    // for convenience, decode BRA.
-    var add = Assembler.OP_BINARY["add"];
-    var sub = Assembler.OP_BINARY["sub"];
-    var pc = Assembler.SPECIALS["pc"];
-
-    if (op.opcode == add && op.b == pc && op.a_immediate !== undefined) {
-      res.code = wrapAs("op", "BRA") + " " + this.address(offset + op.size + op.a_immediate, labels);
-      return res;
-    }
-    if (op.opcode == sub && op.b == pc && op.a_immediate !== undefined) {
-      res.code = wrapAs("op", "BRA") + " " + this.address(offset + op.size - op.a_immediate, labels);
-      return res;
-    }
-
     var va = this.decodeValue(true, op.a, op.a_immediate, labels, wrapAs);
     var vb = this.decodeValue(false, op.b, op.b_immediate, labels, wrapAs);
+
+    // BRA pseudo-opcode is very convinient, but we want disassembled code to as compatible as possible
 
     if (op.opcode == 0) {
       // special
       var code = this.OP_SPECIAL[op.b];
-      if (code === undefined) code = "???";
-      res.code = wrapAs("op", code) + " " + va;
+      if (code === undefined) {
+        logger(offset, "Unknown non-basic instruction: " + op.opcode.toString(16));
+
+        // again, for compatability purposes, decode unknown instructions as DATs (and add a comment)
+        res.code = wrapAs("op", "DAT") + " ";
+        for (var i = 0; i < op.size; i++) {
+          res.code += "0x" + pad(memory[offset + i].toString(16), 4) + (i < op.size - 1 ? ", " : "");
+        }
+        res.code += "  ; " + wrapAs("op", "???") + " " + va;
+      } else {
+        res.code = wrapAs("op", code) + " " + va;
+      }
+      switch (op.b) {
+        case 0x01:   // JSR
+        case 0x0a: { // IAS
+          if (op.a_immediate !== undefined) {
+            res.branch = op.a_immediate;
+            if (!labels[res.branch]) {
+              labels.last++;
+              labels[res.branch] = (op.b == 0x0a ? "int_handler" : "subroutine") + labels.last;
+            }
+            res.code = wrapAs("op", code) + " " + wrapAs("lbl", labels[res.branch]);
+          }
+          return res;
+        }
+      }
     } else {
       var code = this.OP_BINARY[op.opcode];
-      if (code === undefined) code = "???";
-      res.code = wrapAs("op", code) + " " + vb + ", " + va;
+      if (code === undefined) {
+        logger(offset, "Unknown basic instruction: " + op.opcode.toString(16));
+
+        // again, for compatability purposes, decode unknown instructions as DATs (and add a comment)
+        res.code = wrapAs("op", "DAT") + " ";
+        for (var i = 0; i < op.size; i++) {
+          res.code += "0x" + pad(memory[offset + i].toString(16), 4) + (i < op.size - 1 ? ", " : "");
+        }
+        res.code += "  ; " + wrapAs("op", "???") + " " + vb + ", " + va;
+      } else {
+        res.code = wrapAs("op", code) + " " + vb + ", " + va;
+      }
       if (op.opcode >= 0x10 && op.opcode <= 0x17) {
         res.conditional = true;
+      } else
+      if (op.b == 0x1c) { // PC
+        offset += res.size;
+        res.terminal = true;
+        if (op.a_immediate === undefined) {
+          if (op.a != 0x18) // assuming SET PC, POP - RET
+            logger(offset, "(Warning) Can't predict the value of PC after " + res.code + ". Some instructions may be not disassembled.");
+        } else
+        switch (op.opcode) {
+          case 0x01:
+          case 0x0f: {
+            res.branch = op.a_immediate;
+            if (!labels[res.branch]) {
+              labels.last++;
+              labels[res.branch] = "label" + labels.last;
+            }
+            res.code = wrapAs("op", code) + " " + vb + ", " + wrapAs("lbl", labels[res.branch]);
+            break;
+          }
+          case 0x02: { res.branch = (offset + op.a_immediate) & 0xffff; break; }
+          case 0x03: { res.branch = (offset - op.a_immediate) & 0xffff; break; }
+          case 0x04: { res.branch = (offset * op.a_immediate) & 0xffff; break; }
+          case 0x05: { res.branch = (DCPU.extendSign(offset) * DCPU.extendSign(op.a_immediate)) & 0xffff; break; }
+          case 0x06: { res.branch = parseInt(offset / op.a_immediate) & 0xffff; break; }
+          case 0x07: { res.branch = parseInt(DCPU.extendSign(offset) / DCPU.extendSign(op.a_immediate)) & 0xffff; break; }
+          case 0x08: { res.branch = (op.a_immediate == 0) ? 0 : (offset % va.literal); break; }
+          case 0x09: { res.branch = (offset & op.a_immediate); break; }
+          case 0x0a: { res.branch = (offset | op.a_immediate); break; }
+          case 0x0b: { res.branch = (offset ^ op.a_immediate); break; }
+          case 0x0c: { res.branch = (offset >>> op.a_immediate) & 0xffff; break; }
+          case 0x0d: { res.branch = (DCPU.extendSign(offset) >> op.a_immediate) & 0xffff; break; }
+          case 0x0e: { res.branch = (offset << op.a_immediate) & 0xffff; break; }
+          case 0x1a: { res.branch = (offset + op.a_immediate) & 0xffff; break; }
+          case 0x1b: { res.branch = (offset - op.a_immediate) & 0xffff; break; }
+        }
       }
     }
     return res;
