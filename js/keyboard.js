@@ -39,6 +39,8 @@ var Keyboard = {
     this.buffer = [ ];
     this.shift_down = false;
     this.control_down = false;
+    this.message = 0;
+    this.pressed = {};
     this.translate = { };
     this.translate[this.JS.BS] = this.BS;
     this.translate[this.JS.ENTER] = this.ENTER;
@@ -50,17 +52,21 @@ var Keyboard = {
     this.translate[this.JS.RIGHT] = this.RIGHT;
   },
 
-  onkeydown: function(event) {
+  onkeydown: function(event, queueInterrupt) {
     var code = window.event ? event.keyCode : event.which;
     switch (code) {
       case this.JS.SHIFT: {
         this.shift_down = true;
-        return true;
       }
       case this.JS.CONTROL: {
         this.control_down = true;
-        return true;
       }
+    }
+    this.pressed[this.translate[code]] = true;
+    if (this.message) {
+      queueInterrupt(function(memory, registers, state, hardware) {
+        registers.A = this.message;
+      });
     }
     // have to intercept BS or chrome will do something weird.
     if (code == this.JS.BS || code == this.JS.UP || code == this.JS.DOWN ||
@@ -71,7 +77,7 @@ var Keyboard = {
     return true;
   },
 
-  onkeypress: function(event) {
+  onkeypress: function(event, queueInterrupt) {
     var code = window.event ? event.keyCode : event.which;
     if (this.translate[code]) {
       code = this.translate[code];
@@ -83,9 +89,14 @@ var Keyboard = {
     // small 8-character buffer
     if (this.buffer.length > 8) this.buffer.shift();
     // keychar = String.fromCharCode(keynum);
+    if (this.message) {
+      queueInterrupt(function(memory, registers, state, hardware) {
+        registers.A = this.message;
+      });
+    }
   },
 
-  onkeyup: function(event) {
+  onkeyup: function(event, queueInterrupt) {
     var code = window.event ? event.keyCode : event.which;
     switch (code) {
       case this.JS.SHIFT: {
@@ -96,6 +107,12 @@ var Keyboard = {
         this.control_down = false;
         break;
       }
+    }
+    this.pressed[this.translate[code]] = false;
+    if (this.message) {
+      queueInterrupt(function(memory, registers, state, hardware) {
+        registers.A = this.message;
+      });
     }
   },
 
@@ -111,11 +128,11 @@ var Keyboard = {
         break;
       }
       case this.SCAN_KEYBOARD: {
-        // FIXME
+        registers.C = this.pressed[registers.B] ? 1 : 0;
         break;
       }
       case this.SET_INT: {
-        // FIXME
+        this.message = registers.B;
         break;
       }
     }

@@ -149,6 +149,9 @@ var Disassembler = {
       } else {
         res.code = wrapAs("op", code) + " " + va;
       }
+      if (op.b) { // RFI
+        res.terminal = true;
+      } else
       switch (op.b) {
         case 0x01:   // JSR
         case 0x0a: { // IAS

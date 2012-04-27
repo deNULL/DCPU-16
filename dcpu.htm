@@ -1,9 +1,10 @@
 <html>
 <head>
   <title>DCPU-16 emulator</title>
+  <script type="text/javascript" src="js/common.js?v=1"></script>
   <script type="text/javascript" src="js/assembler.js?v=1"></script>
   <script type="text/javascript" src="js/disassembler.js?v=1"></script>
-  <script type="text/javascript" src="js/dcpu.js?v=1"></script>
+  <script type="text/javascript" src="js/emulator.js?v=1"></script>
   <script type="text/javascript" src="js/screen.js?v=1"></script>
   <script type="text/javascript" src="js/keyboard.js?v=1"></script>
   <style>
@@ -381,6 +382,7 @@ echo htmlspecialchars($code);?></textarea>
     var memToLine = {};
     var lineToMem = {};
     var breaks = {};
+    var state = {interruptQueue: []};
 
     document.onkeydown = function(event) {
       var code = window.event ? event.keyCode : event.which;
@@ -395,7 +397,9 @@ echo htmlspecialchars($code);?></textarea>
         }
         default: { // pass it to program
           if (!runningTimer) return true;
-          return Keyboard.onkeydown(event);
+          return Keyboard.onkeydown(event, function(interrupt) {
+            DCPU.queueInterrupt(memory, registers, state, [Screen, Keyboard], interrupt);
+          });
         }
       }
     };
@@ -403,11 +407,15 @@ echo htmlspecialchars($code);?></textarea>
       if (!runningTimer) return true;
       if (event.which == 8) { return false; }
 
-      Keyboard.onkeypress(event);
+      Keyboard.onkeypress(event, function(interrupt) {
+        DCPU.queueInterrupt(memory, registers, state, [Screen, Keyboard], interrupt);
+      });
     };
     document.onkeyup = function(event) {
       if (!runningTimer) return true;
-      Keyboard.onkeyup(event);
+      Keyboard.onkeyup(event, function(interrupt) {
+        DCPU.queueInterrupt(memory, registers, state, [Screen, Keyboard], interrupt);
+      });
     };
 
     function toggleTab(index) {
@@ -473,9 +481,6 @@ echo htmlspecialchars($code);?></textarea>
     }
     positionHighlight(-1);
     function reset() {
-      for (var i = 0; i <= 0xffff; i++) {
-        if (memory[i]) memory[i] = 0;
-      }
       for (var reg in registers) {
         registers[reg] = 0;
       }
@@ -486,7 +491,7 @@ echo htmlspecialchars($code);?></textarea>
       Screen.MAP_FONT = 0x8180;
       Screen.MAP_PALETTE = 0;
       Screen.BORDER_COLOR = 0;
-      Screen.resetFont(memory);
+      state = {interruptQueue: []};
       assemble();
     }
     var logger = function(offset, msg, fatal) {
@@ -506,7 +511,7 @@ echo htmlspecialchars($code);?></textarea>
 
     function step() {
       ge('loading_overlay').style.display = 'none';
-      var rv = DCPU.step(memory, registers, [ Screen, Keyboard ]);
+      var rv = DCPU.step(memory, registers, state, [ Screen, Keyboard ]);
       if (rv > 0) {
         cycles += rv;
       }
@@ -525,7 +530,7 @@ echo htmlspecialchars($code);?></textarea>
         runningTimer = setInterval(function() {
           var was_cycles = cycles;
           for (var i = 0; i < 10000; i++) {
-            var rv = DCPU.step(memory, registers, [ Screen, Keyboard ]);
+            var rv = DCPU.step(memory, registers, state, [ Screen, Keyboard ]);
             if (rv < 0) { // break
               if (runningTimer) run(button);
               return;
