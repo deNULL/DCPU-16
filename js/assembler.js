@@ -481,6 +481,7 @@ var Assembler = {
           case 'n': { rv += "\n"; break; }
           case 'r': { rv += "\r"; break; }
           case 't': { rv += "\t"; break; }
+          case 'z': { rv += "\x00"; break; }
           case 'x': {
             if (i < s.length - 2) {
               rv += String.fromCharCode(parseInt(s.substr(i + 1, 2), 16));
@@ -513,6 +514,26 @@ var Assembler = {
         for (var j = 0; j < arg.length; j++) {
           info.size++;
           info.dump.push(arg.charCodeAt(j));
+        }
+      } else if (arg.charAt(0) == 'p' && arg.charAt(1) == '"') {
+        // packed string
+        arg = this.unquoteString(arg.substr(2, arg.length - 3));
+        var word = 0, in_word = false;
+        for (var j = 0; j < arg.length; j++) {
+          var c = arg.charCodeAt(j);
+          if (in_word) {
+            word |= c;
+            info.size++;
+            info.dump.push(word);
+            in_word = false;
+          } else {
+            word = c << 8;
+            in_word = true;
+          }
+        }
+        if (in_word) {
+          info.size++;
+          info.dump.push(word);
         }
       } else {
         var expr = this.parseExpression(this.stateFromArg(true, line, i, subst, logger), 0);
@@ -881,8 +902,6 @@ var Assembler = {
         if (pc + info.size > 0xffff) {
           l_logger(0, "Code is too big (exceeds 128 KB) &mdash; not enough memory", true);
           break;
-        } else if (pc + info.size > 0x8000) {
-          l_logger(0, "Code is too big (exceeds 64 KB) &mdash; overlaps video memory");
         }
         if (info.org !== undefined) {
           pc = info.org;
