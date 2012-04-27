@@ -513,6 +513,7 @@ var Assembler = {
 
   handleData: function(info, line, labels, subst, logger) {
     var args = line.args;
+    info.data_expr = [];
     for (var i = 0; i < args.length; i++) {
       var arg = args[i];
       if (arg.length == 0) continue;
@@ -521,6 +522,7 @@ var Assembler = {
         for (var j = 0; j < arg.length; j++) {
           info.size++;
           info.dump.push(arg.charCodeAt(j));
+          info.data_expr.push(false);
         }
       } else if (arg.charAt(0) == 'p' && arg.charAt(1) == '"') {
         // packed string
@@ -532,6 +534,7 @@ var Assembler = {
             word |= c;
             info.size++;
             info.dump.push(word);
+            info.data_expr.push(false);
             in_word = false;
           } else {
             word = c << 8;
@@ -541,14 +544,14 @@ var Assembler = {
         if (in_word) {
           info.size++;
           info.dump.push(word);
+          info.data_expr.push(false);
         }
       } else {
         var expr = this.parseExpression(this.stateFromArg(true, line, i, subst, logger), 0);
         if (!expr) return false;
-        var value = this.evalConstant(expr, labels, true);
-        if (value === false) return false;
         info.size++;
-        info.dump.push(value);
+        info.dump.push(0x0000);
+        info.data_expr.push(expr);
       }
     }
     return info;
@@ -860,6 +863,15 @@ var Assembler = {
       }
       info.dump[0] = ((offset + 0x21) << 10) | (info.b.code << 5) | opcode;
       return info;
+    }
+    if (info.data_expr) {
+      for (var i = 0; i < info.data_expr.length; i++) {
+        if (info.data_expr[i]) { // unresolved expression
+          var value = this.evalConstant(info.data_expr[i], labels, true);
+          if (value === false) return false;
+          info.dump[i] = value;
+        }
+      }
     }
     if (info.a !== undefined) {
       if (info.a.expr !== undefined) {
