@@ -26,12 +26,13 @@ var Keyboard = {
     ENTER: 13,
     SHIFT: 16,
     CONTROL: 17,
+    SPACE: 32,
     LEFT: 37,
     UP: 38,
     RIGHT: 39,
     DOWN: 40,
-    INSERT: 45,
-    DELETE: 46,
+//    INSERT: 45,
+ //   DELETE: 46,
   },
 
   init: function() {
@@ -63,7 +64,7 @@ var Keyboard = {
     }
     // have to intercept BS or chrome will do something weird.
     if (code == this.JS.BS || code == this.JS.UP || code == this.JS.DOWN ||
-        code == this.JS.LEFT || code == this.JS.RIGHT) {
+        code == this.JS.LEFT || code == this.JS.RIGHT || code == this.JS.SPACE) {
       this.onkeypress(event);
       return false;
     }
