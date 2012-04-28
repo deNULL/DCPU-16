@@ -941,7 +941,7 @@ var Assembler = {
         logger(i, pc, pos, text, fatal);
         if (fatal) aborted = true;
       };
-      labels["."] = info.pc;
+      labels["."] = infos[i].pc;
       infos[i] = this.resolveLine(infos[i], labels, l_logger);
       if (!infos[i]) break;
       for (var j = 0; j < infos[i].dump.length; j++) {
