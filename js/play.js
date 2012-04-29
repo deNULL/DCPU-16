@@ -8,8 +8,10 @@ var breaks = {};
 var state = { interruptQueue: [] };
 
 function scrollToLine(n) {
-  var bottom = ge("log").getClientRects()[0].top;
-  var top = ge("tab0_wrapper").getClientRects()[0].top;
+  var logRects = ge("log").getClientRects();
+  var tabRects = ge("tab0_wrapper").getClientRects();
+  var bottom = (logRects.length == 0) ? tabRects[0].bottom : logRects[0].top;
+  var top = tabRects[0].top;
   var line = ge("ln" + n).getClientRects()[0];
   if (line.top < top + line.height) {
     ge("tab0_wrapper").scrollTop = (n == 0) ? 0 : (n - 1) * line.height;
@@ -61,7 +63,7 @@ document.onkeyup = function(event) {
 };
 
 function toggleTab(index) {
-  for (var i = 0; i < 2; i++) {
+  for (var i = 0; i < 3; i++) {
     ge("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
     ge("tab" + i).className = "tab pointer " + ((index == i) ? "tab_active" : "tab_inactive");
   }
@@ -80,43 +82,41 @@ updateRegisters();
 function updateMemoryView() {
   var lns = "";
   var s = "";
-  var offs = ge("memory_window").scrollTop * 8;
-  ge("memory_lines").style.top = (offs / 8) + "px";
-  ge("memory_view").style.top = (offs / 8) + "px";
-  for (var i = 0; i < 16; i++) {
-    lns += pad((offs + i * 8).toString(16), 4) + ":<br/>";
+  // FIXME: reimplement smart display (display only what's visible)
+  for (var i = 0; i < 0x200; i += 8) {
+    lns += pad(i.toString(16), 4) + "<br/>";
     for (var j = 0; j < 8; j++) {
-      var v = memory[offs + i * 8 + j];
-      if (!v) v = 0;
-      v = pad(v.toString(16), 4);
-      if (((offs + i * 8 + j + 1) & 0xffff) == registers.SP) {
-        s += " <u class='cur_sp'>" + v + "</u>";
-      } else
-      if (offs + i * 8 + j == registers.PC) {
-        s += " <u class='cur_pc'>" + v + "</u>";
+      v = pad((memory[i + j] || 0).toString(16), 4);
+      if (((i + j + 1) & 0xffff) == registers.SP) {
+        s += " <span class='cur_sp'>" + v + "</span>";
+      } else if (i + j == registers.PC) {
+        s += " <span class='cur_pc'>" + v + "</span>";
       } else {
         s += " " + v;
       }
     }
     s += "<br/>";
   }
-  ge("memory_lines").innerHTML = lns;
-  ge("memory_view").innerHTML = s;
+  ge("md_lines").innerHTML = lns + "wut<br/>";
+  ge("md_dump").innerHTML = s;
+
+  matchHeight(ge("md_dump"), ge("md_lines"));
 }
 updateMemoryView();
 
 function positionHighlight(line) {
   var hlight = ge("line_highlight");
   if (line >= 0) {
-    hlight.style.top = (line * 20 + 5) + "px";
+    hlight.style.top = (line * computedHeight(hlight) + 5) + "px";
     hlight.style.display = "block";
-    this.scrollToLine(line);
   } else {
     hlight.style.display = "none";
   }
 }
-function updateHighlight() {
-  positionHighlight(memToLine[registers.PC] - 1);
+function updateHighlight(alsoScroll) {
+  var line = memToLine[registers.PC] - 1;
+  positionHighlight(line);
+  if (alsoScroll) this.scrollToLine(line);
 }
 positionHighlight(-1);
 
@@ -140,15 +140,14 @@ var logger = function(offset, msg, fatal) {
   if (fatal) clearInterval(runningTimer);
 };
 
-function updateViews(show_all) {
-  if (show_all) {
-    updateHighlight();
-  }
+function updateViews(alsoScroll) {
+  updateHighlight(alsoScroll);
   updateMemoryView();
   updateRegisters();
   Screen.update(memory);
   document.getElementById("cycles").innerHTML = cycles;
-}
+  resizeTabs();
+ }
 
 function step() {
   ge('loading_overlay').style.display = 'none';
@@ -216,6 +215,7 @@ function assemble() {
       (fatal ? "(<span class='fatal'>Fatal</span>) " : "") +
       message);
     ge("ln" + line).style.backgroundColor = '#f88';
+    ge("log").style.display = "block";
   };
   for (var i = 0; i < 0xffff; i++) {
     if (memory[i]) memory[i] = 0;
@@ -251,9 +251,9 @@ function assemble() {
   ge("offsets").innerHTML = offsets.join("<br/>");
   ge("dump").innerHTML = dump.join("<br/>");
   ge("log").innerHTML = log.join("<br/>");
+  ge("log").style.display = (log.length == 0) ? "none" : "block";
 
-  var height = parseInt(document.defaultView.getComputedStyle(ge("linenums"), "").getPropertyValue("height"));
-  ge("code").style.height = height + "px";
+  matchHeight(ge("code"), ge("linenums"));
 
   for (var line in breaks) {
     if (breaks[line] && (lineToMem[line] === undefined)) {
@@ -282,6 +282,7 @@ function disassemble() {
   var log = [];
   var logger = function(offset, msg, fatal) {
     log.push("<span class='line'>" + pad(offset, 4) + ":</span> " + (fatal ? "(<span class='fatal'>Fatal</span>) " : "") + msg);
+    ge("log").style.display = "block";
     if (fatal) aborted = true;
   };
 
@@ -360,9 +361,7 @@ function disassemble() {
   ge("da_lines").innerHTML = lines.join("<br/>");
   ge("da_code").innerHTML = output.join("<br/>");
   ge("log").innerHTML = log.join("<br/>");
-
-  var height = parseInt(document.defaultView.getComputedStyle(ge("da_code"), "").getPropertyValue("height"));
-  ge("da_input").style.height = (height + 20) + "px";
+  matchHeight(ge("da_input"), ge("da_code"));
 }
 
 function disassembleDump() {
@@ -384,6 +383,14 @@ disassemble();
 reset();
 var lastCode = ge("code").value;
 var lastInput = ge("da_input").value;
+
+function resizeTabs(event) {
+  var headerHeight = ge("header").clientHeight + ge("tab_row").clientHeight + bodyMargin();
+  for (var i = 0; i < 3; i++) {
+    ge("tab" + i + "_wrapper").style.height = (window.innerHeight - headerHeight) + "px";
+  }
+};
+window.onresize = resizeTabs;
 
 setInterval(function() {
   Screen.blink = !Screen.blink;

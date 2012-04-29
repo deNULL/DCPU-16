@@ -20,16 +20,17 @@
 
     <section class="noscroll" id="body">
       <div class="row-fluid main noscroll" style="height: 100%">
-        <div class="span8 noscroll">
-          <div class="row-fluid">
+        <div class="span8 noscroll" id="left_panel">
+          <div class="row-fluid" id="tab_row">
             <div class="span1"></div>
             <div class="span7 tabs">
               <a onclick="toggleTab(0)" class="tab pointer tab_active" id="tab0">Assembler</a>
               <a onclick="toggleTab(1)" class="tab pointer tab_inactive" id="tab1">Disassembler</a>
+              <a onclick="toggleTab(2)" class="tab pointer tab_inactive" id="tab2">Memory Dump</a>
             </div>
             <div class="span4"></div>
           </div>
-          <div class="row-fluid" id="tab0_wrapper">
+          <div class="row-fluid tab_content" id="tab0_wrapper">
             <div class="span1 mono pointer linenums">
               <div>
                 <span id="line_highlight"></span>
@@ -50,7 +51,7 @@
             <div class="span3 mono dump" id="dump">
             </div>
           </div>
-          <div class="row-fluid" id="tab1_wrapper" style="position: relative">
+          <div class="row-fluid tab_content" id="tab1_wrapper">
             <div class="span1 mono linenums">
             </div>
             <div class="span4 editor_div">
@@ -60,6 +61,18 @@
             <div class="span1 mono linenums addr" id="da_lines">
             </div>
             <div class="span6 mono dump" id="da_code">
+            </div>
+          </div>
+          <div class="row-fluid tab_content" id="tab2_wrapper">
+            <div class="span1 mono linenums" id="md_lines">
+            </div>
+            <div class="span7 editor_div">
+              <div class="mono" id="md_dump">
+              </div>
+            </div>
+            <div class="span1 mono linenums addr" id="md_unused">
+            </div>
+            <div class="span3 mono dump" id="md_code">
             </div>
           </div>
         </div>

@@ -7,6 +7,14 @@ body {
   height: 100%;
   overflow-y: hidden;
 }
+a {
+  text-decoration: none !important;
+}
+.mono {
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 20px;
+}
 
 /* override bootstrap */
 .row-fluid [class*="span"] {
@@ -33,9 +41,6 @@ body {
   margin: 0px 1px;
   min-height: 0px;  /* override bootstrap */
 }
-a {
-  text-decoration: none !important;
-}
 .tab_active {
   background-color: #8AE;
   color: white !important;
@@ -51,22 +56,18 @@ a {
   height: 100%;
   overflow-y: no-display;
 }
-#tab0_wrapper {
-  height: 90%;
+.tab_content {
+  height: 100%;
   overflow-y: scroll;
-  position: relative;
+  position: relative; /* so highlight line will work */  
+}
+#tab2_wrapper {
+  display: none;
 }
 #tab1_wrapper {
   display: none;
-  height: 100%;
-  overflow-y: scroll;
-  position: relative;
 }
 
-.mono {
-  font-family: monospace;
-  font-size: 14px;
-}
 .linenums {
   padding-left: 0px;
   padding-top: 5px;
@@ -88,16 +89,15 @@ a {
 .linenum {
   margin-left: 1.0em !important;
   display: block;
+  line-height: 18px;
   padding-top: 1px;
   padding-bottom: 1px;
   padding-right: 5px;
 }
 .addr {
-  line-height: 20px;
   margin-left: 0px !important;
 }
 .dump {
-  line-height: 20px;
   margin-left: 1.0em !important;
   padding-top: 6px;
   white-space: nowrap;
@@ -111,20 +111,15 @@ a {
   left: 0;
   top: 6px;
   width: 100%;
-  height: 19px;
+  height: 20px;
   z-index: -1000;
 }
 
-.tab0_wrapper {
-  overflow-y: scroll;
-}
 .editor_div {
   margin-left: 0.5em !important;
-  padding-bottom: 3em;
 }
 .editor {
   color: black;
-  line-height: 20px;
   width: 100%;
   min-height: 20em;
   background-color: transparent;
@@ -203,6 +198,12 @@ a {
   padding: 5px 10px;
 }
 
+#md_dump {
+  border: solid 2px #ccc;
+  border-radius: 2px;
+  padding-top: 3px;
+  padding-left: 0.5em;
+}
 #memory_wrapper {
   position: relative;
   margin-top: 0.5em;
