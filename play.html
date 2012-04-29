@@ -63,16 +63,16 @@
             <div class="span6 mono dump" id="da_code">
             </div>
           </div>
-          <div class="row-fluid tab_content" id="tab2_wrapper">
-            <div class="span1 mono linenums" id="md_lines">
-            </div>
-            <div class="span7 editor_div">
-              <div class="mono" id="md_dump">
+          <div class="row-fluid tab_content" id="tab2_wrapper" onscroll="updateMemoryView()">
+            <div id="md_view">
+              <div class="span1 mono linenums" id="md_lines">
               </div>
-            </div>
-            <div class="span1 mono linenums addr" id="md_unused">
-            </div>
-            <div class="span3 mono dump" id="md_code">
+              <div class="span7 mono editor_div" id="md_dump">
+              </div>
+              <div class="span1 mono linenums addr" id="md_unused">
+              </div>
+              <div class="span3 mono dump" id="md_code">
+              </div>
             </div>
           </div>
         </div>
@@ -124,19 +124,8 @@
             </table>
           </div>
 
-          <div class="row-fluid memory">
-            <div class="span6 memory_title">
-              <h4>Memory dump:</h4>
-            </div>
-            <div class="span6 disassemble">
-              <button onclick="disassembleDump()" id="disassemble">Disassemble</button>
-            </div>
-          </div>
-          <div id="memory_wrapper" class="mono">
-            <div id="memory_window" onscroll="updateMemoryView()">
-              <div id="memory_lines" class=""></div>
-              <div id="memory_view" class=""></div></div>
-            </div>
+          <div class="row-fluid">
+            <button onclick="disassembleDump()" id="disassemble">Disassemble</button>
           </div>
         </div>
       </div>

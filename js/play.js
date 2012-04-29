@@ -24,7 +24,6 @@ function scrollToLine(n) {
 window.frames[0].onload = function() {
   var imported_text = window.frames[0].document.documentElement.innerText;
   ge("code").value = imported_text;
-//  setTimeout(function() { updateHighlight(); }, 1000);
   reset();
 };
 
@@ -82,25 +81,28 @@ updateRegisters();
 function updateMemoryView() {
   var lns = "";
   var s = "";
-  // FIXME: reimplement smart display (display only what's visible)
-  for (var i = 0; i < 0x200; i += 8) {
-    lns += pad(i.toString(16), 4) + "<br/>";
+  var offs = ge("tab2_wrapper").scrollTop * 8;
+  ge("md_lines").style.top = (offs / 8) + "px";
+  ge("md_dump").style.top = (offs / 8) + "px";
+  for (var addr = offs; (addr < offs + 256) && (addr < 0x10000); addr += 8) {
+    lns += pad(addr.toString(16), 4) + ":<br/>";
     for (var j = 0; j < 8; j++) {
-      v = pad((memory[i + j] || 0).toString(16), 4);
-      if (((i + j + 1) & 0xffff) == registers.SP) {
-        s += " <span class='cur_sp'>" + v + "</span>";
-      } else if (i + j == registers.PC) {
-        s += " <span class='cur_pc'>" + v + "</span>";
+      var v = memory[addr + j];
+      if (!v) v = 0;
+      v = pad(v.toString(16), 4);
+      if (((addr + j + 1) & 0xffff) == registers.SP) {
+        s += " <u class='cur_sp'>" + v + "</u>";
+      } else
+      if (addr + j == registers.PC) {
+        s += " <u class='cur_pc'>" + v + "</u>";
       } else {
         s += " " + v;
       }
     }
     s += "<br/>";
   }
-  ge("md_lines").innerHTML = lns + "wut<br/>";
+  ge("md_lines").innerHTML = lns;
   ge("md_dump").innerHTML = s;
-
-  matchHeight(ge("md_dump"), ge("md_lines"));
 }
 updateMemoryView();
 
@@ -386,9 +388,10 @@ var lastInput = ge("da_input").value;
 
 function resizeTabs(event) {
   var headerHeight = ge("header").clientHeight + ge("tab_row").clientHeight + bodyMargin();
-  for (var i = 0; i < 3; i++) {
+  for (var i = 0; i < 2; i++) {
     ge("tab" + i + "_wrapper").style.height = (window.innerHeight - headerHeight) + "px";
   }
+  ge("tab2_wrapper").style.height = (32 * 20 + 7) + "px";
 };
 window.onresize = resizeTabs;
 

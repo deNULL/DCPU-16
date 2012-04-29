@@ -61,11 +61,13 @@ a {
   overflow-y: scroll;
   position: relative; /* so highlight line will work */  
 }
-#tab2_wrapper {
-  display: none;
-}
 #tab1_wrapper {
   display: none;
+}
+#tab2_wrapper {
+  display: none;
+  overflow-y: scroll;
+  position: relative;
 }
 
 .linenums {
@@ -123,6 +125,26 @@ a {
   width: 100%;
   min-height: 20em;
   background-color: transparent;
+}
+
+#md_view {
+  position: relative;
+  top: 0px;
+  left: 0px;
+  height: 8807px;
+}
+#md_lines {
+  position: relative;
+  top: 0px;
+}
+#md_dump {
+  position: relative;
+  top: 0px;
+  left: 0px;
+  border: solid 2px #ccc;
+  border-radius: 2px;
+  padding-top: 3px;
+  padding-left: 0.5em;
 }
 
 .screen_frame {
@@ -184,46 +206,9 @@ a {
   text-align: right;
 }
 
-.memory {
-  margin-top: 1em;
-}
-.memory_title {
-  padding-top: 10px;
-}
-.disassemble {
-  text-align: right;
-  width: 100%;
-}
 #disassemble {
   padding: 5px 10px;
-}
-
-#md_dump {
-  border: solid 2px #ccc;
-  border-radius: 2px;
-  padding-top: 3px;
-  padding-left: 0.5em;
-}
-#memory_wrapper {
-  position: relative;
-  margin-top: 0.5em;
-}
-#memory_window {
-  xx-overflow-y: scroll;
-}
-#memory_view {
-  position: relative;
-  float: left;
-  top: 0px;
-  left:0px;
-}
-#memory_lines {
-  position: relative;
-  float: left;
-  top: 0px;
-  left: 0px;
-  padding-right: 6px;
-  color: gray;
+  margin-top: 1em;
 }
 
 #log_frame {
