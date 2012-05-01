@@ -432,19 +432,28 @@ step: function(memory, registers, state, hardware) {
       }
       case 0x1e: { // STI
         v = av;
-        registers.I = (registers.I + 1) & 0xffff;
-        registers.J = (registers.J + 1) & 0xffff;
         DCPU.cycles += 2;
         break;
       }
       case 0x1f: { // STD
-        registers.I = (registers.I - 1) & 0xffff;
-        registers.J = (registers.J - 1) & 0xffff;
+        v = av;
         DCPU.cycles += 2;
         break;
       }
     }
     DCPU.setValue(bb, v & 0xffff, memory, registers);
+    switch (op) {        
+      case 0x1e: { // STI
+        registers.I = (registers.I + 1) & 0xffff;
+        registers.J = (registers.J + 1) & 0xffff;
+        break;
+      }
+      case 0x1f: { // STD
+        registers.I = (registers.I - 1) & 0xffff;
+        registers.J = (registers.J - 1) & 0xffff;
+        break;
+      }
+    }
     return DCPU.cycles;
   }
 },
