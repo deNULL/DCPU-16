@@ -56,7 +56,7 @@ var Assembler = {
     "int": 0x08,
     "iag": 0x09,
     "ias": 0x0a,
-    "iap": 0x0b,
+    "rfi": 0x0b,
     "iaq": 0x0c,
     // ...
     "hwn": 0x10,
@@ -111,6 +111,10 @@ var Assembler = {
         return false;
       }
       atom.state.pos = pos + 1;
+    } else if (text.charAt(pos) == "'" && text.charAt(pos + 2) == "'") {
+      atom.literal = text.charCodeAt(pos + 1);
+      atom.state = state;
+      atom.state.pos = pos + 3;
     } else {
       var operand = text.substr(pos, end - pos).match(/^[A-Za-z_.0-9]+/);
       if (!operand) {
@@ -315,14 +319,15 @@ var Assembler = {
 
     // strip comments so we don't have to worry about them
     var in_string = false;
+    var in_char = false
     for (var i = 0; i < text.length; i++) {
       if (in_string && text.charAt(i) == '\\' && i < text.length - 1) {
         i++;
-      } else
-      if (text.charAt(i) == '"') {
+      } else if (text.charAt(i) == '"') {
         in_string = !in_string;
-      } else
-      if (text.charAt(i) == ';' && !in_string) {
+      } else if (text.charAt(i) == '\'' && !in_string) {
+        in_char = !in_char;
+      } else if (text.charAt(i) == ';' && !in_string && !in_char) {
         end = i;
         break;
       }
@@ -442,6 +447,7 @@ var Assembler = {
     var arg_ends = [ -1 ];
     var n = 0;
     in_string = false;
+    in_char = false;
     for (var i = pos; i < end; i++) {
       if (text.charAt(i) == '\\' && i + 1 < end) {
         if (arg_locs[n] == -1) arg_locs[n] = i;
@@ -449,15 +455,19 @@ var Assembler = {
       } else if (text.charAt(i) == '"') {
         in_string = !in_string;
         args[n] += text.charAt(i);
-      } else if (text.charAt(i) == ',' && !in_string) {
+      } else if (text.charAt(i) == "\'" && !in_string) {
+        in_char = !in_char;
+        args[n] += text.charAt(i);
+        if (arg_locs[n] == -1) arg_locs[n] = i;
+      } else if (text.charAt(i) == ',' && !in_string && !in_char) {
         arg_ends[n] = i;
         args.push("");
         arg_locs.push(-1);
         arg_ends.push(-1);
         n += 1;
-      } else if (text.charAt(i) == ';' && !in_string) {
+      } else if (text.charAt(i) == ';' && !in_string && !in_char) {
         break;
-      } else if (in_string || text.charAt(i) != ' ') {
+      } else if (in_string || in_char || text.charAt(i) != ' ') {
         if (arg_locs[n] == -1) arg_locs[n] = i;
         args[n] += text.charAt(i);
       }

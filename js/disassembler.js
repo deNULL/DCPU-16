@@ -50,7 +50,7 @@ var Disassembler = {
     0x08: "INT",
     0x09: "IAG",
     0x0a: "IAS",
-    0x0b: "IAP",
+    0x0b: "RFI",
     0x0c: "IAQ",
     // ...
     0x10: "HWN",
