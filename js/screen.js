@@ -78,34 +78,6 @@ var Screen = {
         this.image.data[(j * this.DISPLAY_WIDTH * this.PIXEL_SIZE + i) * 4 + 3] = 0xff; // set alpha
       }
     }
-    //this.loadFont();
-  },
-
-  // load font from image (unused for now)
-  loadFont: function() {
-    var charWidth = 4, charHeight = 8;
-    var fontCanvas = document.getElementById('fontCanvas');
-    var fontCtx = fontCanvas.getContext('2d');
-    var fontImage = new Image();
-    var self = this;
-    fontImage.onload = function() {
-      fontCtx.drawImage(fontImage, 0, 0);
-      for (var i = 0; i < 4; i++) {
-        for (var j = 0; j < 32; j++) {
-          var fontData = fontCtx.getImageData(j * charWidth, i * charHeight, charWidth, charHeight), charId = (i * 32) + j;
-          var glyph = 0;
-          for (var x = 0; x < charWidth; x++) {
-            for (var y = charHeight - 1; y >= 0; y--) {
-              var pixelId = y * charWidth + x;
-              glyph = (glyph << 1) | ((fontData.data[pixelId * charWidth + 1] > 128) * 1);
-            }
-          }
-          self.defaultFont[(i * 32 + j) * 2] = (glyph >> 16);
-          self.defaultFont[(i * 32 + j) * 2 + 1] = (glyph & 0xffff);
-        }
-      }
-    };
-    fontImage.src = 'font.png';
   },
 
   resetFont: function(memory) {
