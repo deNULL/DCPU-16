@@ -8,8 +8,10 @@ var breaks = {};
 var state = { interruptQueue: [] };
 
 function scrollToLine(n) {
+  if (!ge("ln" + n)) return;
   var logRects = ge("log").getClientRects();
   var tabRects = ge("tab0_wrapper").getClientRects();
+  if (tabRects.length == 0) return;
   var bottom = (logRects.length == 0) ? tabRects[0].bottom : logRects[0].top;
   var top = tabRects[0].top;
   var line = ge("ln" + n).getClientRects()[0];
@@ -66,8 +68,6 @@ function toggleTab(index) {
     ge("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
     ge("tab" + i).className = "tab pointer " + ((index == i) ? "tab_active" : "tab_inactive");
   }
-  assemble();
-  disassemble();
 }
 
 function updateRegisters() {
@@ -87,13 +87,10 @@ function updateMemoryView() {
   for (var addr = offs; (addr < offs + 256) && (addr < 0x10000); addr += 8) {
     lns += pad(addr.toString(16), 4) + ":<br/>";
     for (var j = 0; j < 8; j++) {
-      var v = memory[addr + j];
-      if (!v) v = 0;
-      v = pad(v.toString(16), 4);
+      var v = pad(((memory[addr + j] || 0) & 0xffff).toString(16), 4);
       if (((addr + j + 1) & 0xffff) == registers.SP) {
         s += " <u class='cur_sp'>" + v + "</u>";
-      } else
-      if (addr + j == registers.PC) {
+      } else if (addr + j == registers.PC) {
         s += " <u class='cur_pc'>" + v + "</u>";
       } else {
         s += " " + v;

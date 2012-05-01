@@ -3,16 +3,17 @@
   <head>
     <title>DCPU-16 emulator</title>
     <script type="text/javascript" src="js/common.js?v=1"></script>
-    <script type="text/javascript" src="js/assembler.js?v=1"></script>
+    <script type="text/javascript" src="js/assembler.js?v=2"></script>
     <script type="text/javascript" src="js/disassembler.js?v=1"></script>
     <script type="text/javascript" src="js/emulator.js?v=1"></script>
     <script type="text/javascript" src="js/screen.js?v=1"></script>
     <script type="text/javascript" src="js/keyboard.js?v=1"></script>
+    <script type="text/javascript" src="js/fonts.js?v=1"></script>
     <link rel="stylesheet" href="css/bootstrap-2.0.3.css">
     <link rel="stylesheet" href="css/play.css">
   </head>
   <body>
-    <iframe name="ack" src="rom/io.dcpu.txt?v=3" style="display:none"></iframe>
+    <iframe name="ack" src="rom/io.dcpu.txt?v=8" style="display:none"></iframe>
     <section id="header">
       <h3>DCPU-16 Assembler, Emulator &amp; Disassembler</h3>
       <div class="notice">by deNULL. Report any problems at <a href="mailto:me@denull.ru">me@denull.ru</a>.</div>
@@ -79,7 +80,6 @@
         <div class="span4 noscroll">
           <div class="screen_frame">
             <canvas id="screen" width="384" height="288"></canvas>
-            <canvas id="fontCanvas" style="display: none"></canvas>
             <img id="loading_overlay" src="http://i.imgur.com/DcNzS.png" width="384" height="288"/>
           </div>
           <div class="notice">Keyboard input is available while the program is running.</div>
