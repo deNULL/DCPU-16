@@ -5,7 +5,12 @@ var registers = {A: 0, B: 0, C: 0, X: 0, Y: 0, Z: 0, I: 0, J: 0, PC: 0, SP: 0, E
 var memToLine = {};
 var lineToMem = {};
 var breaks = {};
-var state = {interruptQueue: []};
+var state = { interruptQueue: [ ] };
+var hardware = [ Clock, Screen, Keyboard ];
+
+function queueInterrupt(interrupt) {
+  DCPU.queueInterrupt(memory, registers, state, hardware, interrupt);
+};
 
 document.onkeydown = function(event) {
   var code = window.event ? event.keyCode : event.which;
@@ -20,25 +25,21 @@ document.onkeydown = function(event) {
     }
     default: { // pass it to program
       if (!runningTimer) return true;
-      return Keyboard.onkeydown(event, function(interrupt) {
-        DCPU.queueInterrupt(memory, registers, state, [Screen, Keyboard], interrupt);
-      });
+      return Keyboard.onkeydown(event, queueInterrupt);
     }
   }
 };
+
 document.onkeypress = function(event) {
   if (!runningTimer) return true;
   if (event.which == 8) { return false; }
 
-  Keyboard.onkeypress(event, function(interrupt) {
-    DCPU.queueInterrupt(memory, registers, state, [Screen, Keyboard], interrupt);
-  });
+  Keyboard.onkeypress(event, queueInterrupt);
 };
+
 document.onkeyup = function(event) {
   if (!runningTimer) return true;
-  Keyboard.onkeyup(event, function(interrupt) {
-    DCPU.queueInterrupt(memory, registers, state, [Screen, Keyboard], interrupt);
-  });
+  Keyboard.onkeyup(event, queueInterrupt);
 };
 
 function toggleTab(index) {
@@ -134,7 +135,7 @@ function updateViews(show_all) {
 
 function step() {
   ge('loading_overlay').style.display = 'none';
-  var rv = DCPU.step(memory, registers, state, [ Screen, Keyboard ]);
+  var rv = DCPU.step(memory, registers, state, hardware);
   if (rv > 0) {
     cycles += rv;
   }
@@ -145,15 +146,17 @@ var runningTimer = false;
 function run(button) {
   ge('loading_overlay').style.display = 'none';
   if (runningTimer) {
+    Clock.stop();
     clearInterval(runningTimer);
     runningTimer = false;
     button.innerHTML = "&#8595; Run (F5)";
     updateViews(true);
   } else {
+    Clock.start();
     runningTimer = setInterval(function() {
       var was_cycles = cycles;
       for (var i = 0; i < 10000; i++) {
-        var rv = DCPU.step(memory, registers, state, [ Screen, Keyboard ]);
+        var rv = DCPU.step(memory, registers, state, hardware);
         if (rv < 0) { // break
           if (runningTimer) run(button);
           return;
@@ -356,6 +359,7 @@ function disassembleDump() {
   toggleTab(1);
 }
 
+Clock.reset(queueInterrupt);
 Screen.init();
 Keyboard.init();
 disassemble();
@@ -372,9 +376,9 @@ setInterval(function() {
     lastCode = code;
     assemble();
   }
-  var input = ge("code").value;
+  var input = ge("da_input").value;
   if (input != lastInput) {
     lastInput = input;
-    //disassemble();
+    disassemble();
   }
 }, 600);
