@@ -19,20 +19,21 @@ var Keyboard = {
   LEFT: 0x82,
   RIGHT: 0x83,
   SHIFT: 0x90,
-  CONTROL: 0X91,
+  CONTROL: 0x91,
 
   JS: {
     BS: 8,
     ENTER: 13,
     SHIFT: 16,
     CONTROL: 17,
+    ESCAPE: 27,
     SPACE: 32,
     LEFT: 37,
     UP: 38,
     RIGHT: 39,
     DOWN: 40,
-//    INSERT: 45,
- //   DELETE: 46,
+    INSERT: 45,
+    DELETE: 46,
   },
 
   init: function() {
@@ -40,7 +41,7 @@ var Keyboard = {
     this.shift_down = false;
     this.control_down = false;
     this.message = 0;
-    this.pressed = {};
+    this.pressed = { };
     this.translate = { };
     this.translate[this.JS.BS] = this.BS;
     this.translate[this.JS.ENTER] = this.ENTER;
@@ -52,68 +53,109 @@ var Keyboard = {
     this.translate[this.JS.RIGHT] = this.RIGHT;
   },
 
+  trigger: function(queueInterrupt) {
+    var self = this;
+    if (self.message) {
+      queueInterrupt(function(memory, registers, state, hardware) {
+        registers.A = self.message;
+      });
+    }
+  },
+
+  send: function(keycode, queueInterrupt) {
+    this.buffer.push(keycode);
+    // small 8-character buffer:
+    if (this.buffer.length > 8) this.buffer.shift();
+    this.trigger(queueInterrupt);
+  },
+
   onkeydown: function(event, queueInterrupt) {
     var code = window.event ? event.keyCode : event.which;
     switch (code) {
       case this.JS.SHIFT: {
-        this.shift_down = true;
+        this.pressed[this.SHIFT] = true;
+        this.trigger(queueInterrupt);
+        return true;
       }
       case this.JS.CONTROL: {
-        this.control_down = true;
+        this.pressed[this.CONTROL] = true;
+        this.trigger(queueInterrupt);
+        return true;
       }
     }
     this.pressed[this.translate[code]] = true;
-    if (this.message) {
-      queueInterrupt(function(memory, registers, state, hardware) {
-        registers.A = this.message;
-      });
-    }
-    // have to intercept BS or chrome will do something weird.
-    if (code == this.JS.BS || code == this.JS.UP || code == this.JS.DOWN ||
-        code == this.JS.LEFT || code == this.JS.RIGHT || code == this.JS.SPACE) {
-      this.onkeypress(event);
-      return false;
+    this.trigger(queueInterrupt);
+    // have to intercept BS & SPACE or chrome will do something weird.
+    switch (code) {
+      case this.JS.BS: {
+        this.send(this.BS, queueInterrupt);
+        return false;
+      }
+      case this.JS.ENTER: {
+        this.send(this.ENTER, queueInterrupt);
+        return false;
+      }
     }
     return true;
   },
 
   onkeypress: function(event, queueInterrupt) {
     var code = window.event ? event.keyCode : event.which;
-    if (this.translate[code]) {
-      code = this.translate[code];
-    } else if (code < 0x20 || code > 0x7e) {
+    if (code < 0x20 || code > 0x7e) {
       // ignore
       return;
     }
-    this.buffer.push(code);
-    // small 8-character buffer
-    if (this.buffer.length > 8) this.buffer.shift();
-    // keychar = String.fromCharCode(keynum);
-    if (this.message) {
-      queueInterrupt(function(memory, registers, state, hardware) {
-        registers.A = this.message;
-      });
-    }
+    this.send(code, queueInterrupt);
+    return;
   },
 
   onkeyup: function(event, queueInterrupt) {
     var code = window.event ? event.keyCode : event.which;
     switch (code) {
       case this.JS.SHIFT: {
-        this.shift_down = false;
-        break;
+        this.pressed[this.SHIFT] = false;
+        this.trigger(queueInterrupt);
+        return true;
       }
       case this.JS.CONTROL: {
-        this.control_down = false;
-        break;
+        this.pressed[this.CONTROL] = false;
+        this.trigger(queueInterrupt);
+        return true;
       }
     }
     this.pressed[this.translate[code]] = false;
-    if (this.message) {
-      queueInterrupt(function(memory, registers, state, hardware) {
-        registers.A = this.message;
-      });
+    switch (code) {
+      case this.JS.UP: {
+        this.send(this.UP, queueInterrupt);
+        break;
+      }
+      case this.JS.DOWN: {
+        this.send(this.DOWN, queueInterrupt);
+        break;
+      }
+      case this.JS.LEFT: {
+        this.send(this.LEFT, queueInterrupt);
+        break;
+      }
+      case this.JS.RIGHT: {
+        this.send(this.RIGHT, queueInterrupt);
+        break;
+      }
+      case this.JS.INSERT: {
+        this.send(this.INSERT, queueInterrupt);
+        break;
+      }
+      case this.JS.DELETE: {
+        this.send(this.DELETE, queueInterrupt);
+        break;
+      }
+      // macs don't actually have an INSERT key, so let them use ESC.
+      case this.JS.ESCAPE: {
+        this.send(this.INSERT, queueInterrupt);
+        break;
+      }
     }
+    this.trigger(queueInterrupt);
   },
 
   interrupt: function(memory, registers) {
@@ -139,20 +181,3 @@ var Keyboard = {
     return 0;
   },
 };
-
-/*
-Interrupts do different things depending on contents of the A register:
-
- A | BEHAVIOR
----+----------------------------------------------------------------------------
- 0 | Clear keyboard buffer
- 1 | Store next key typed in C register, or 0 if the buffer is empty
- 2 | Set C register to 1 if the key specified by the B register is pressed, or
-   | 0 if it's not pressed
- 3 | If register B is non-zero, turn on interrupts with message B. If B is zero,
-   | disable interrupts
----+----------------------------------------------------------------------------
-
-When interrupts are enabled, the keyboard will trigger an interrupt when one or
-more keys have been pressed, released, or typed.
-*/

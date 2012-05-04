@@ -169,7 +169,9 @@ skip: function(memory, registers) {
 */
 step: function(memory, registers, state, hardware) {
   // maybe there is a better place for this?
-  DCPU.triggerQueuedInterrupt(memory, registers, state, hardware);
+  if (!state.queueInterrupts) {
+    DCPU.triggerQueuedInterrupt(memory, registers, state, hardware);
+  }
 
   var cur = memory[registers.PC] || 0;
   var op = cur & 0x1f;
@@ -199,20 +201,9 @@ step: function(memory, registers, state, hardware) {
       }
       case 0x08: { // INT
         var av = DCPU.getValue(true, aa, memory, registers);
-        if (state.queueInterrupts) {
-          DCPU.queueInterrupt(memory, registers, state, hardware, function(memory, registers, state, hardware) {
-            registers.A = av;
-          });
-        } else
-        if (registers.IA) {
-          state.queueInterrupts = true;
-          registers.SP = (registers.SP - 1) & 0xffff;
-          memory[registers.SP] = registers.PC;
-          registers.SP = (registers.SP - 1) & 0xffff;
-          memory[registers.SP] = registers.A;
-          registers.PC = registers.IA;
+        DCPU.queueInterrupt(memory, registers, state, hardware, function(memory, registers, state, hardware) {
           registers.A = av;
-        }
+        });
         return DCPU.cycles + 4;
       }
       case 0x09: { // IAG
