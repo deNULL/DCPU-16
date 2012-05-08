@@ -149,7 +149,7 @@ var Disassembler = {
       } else {
         res.code = wrapAs("op", code) + " " + va;
       }
-      if (op.b) { // RFI
+      if (op.b == 0x0b) { // RFI
         res.terminal = true;
       } else
       switch (op.b) {
