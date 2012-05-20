@@ -124,7 +124,7 @@ var Assembler = {
       operand = operand[0].toLowerCase();
       pos += operand.length;
       if (subst[operand]) {
-        operand = subst[operand];
+        operand = subst[operand].toLowerCase();
       }
       if (operand.match(/^[0-9]+$/g)) {
         atom.literal = parseInt(operand, 10);
@@ -761,17 +761,18 @@ var Assembler = {
 
       var macro_subst = {};
       for (var i = 0; i < macro.params.length; i++) { // build substitutes
-        macro_subst[macro.params[i]] = line.args[i];
+        var arg = line.args[i];
+        if (subst[arg]) arg = subst[arg];
+        macro_subst[macro.params[i]] = arg;
       }
+      info.expanded = [];
       for (var i = 0; i < macro.lines.length; i++) {
         var macro_info = this.compileLine(macro.lines[i], org, labels, macros, macro_subst, logger);
         if (!macro_info) {
           return false; // error is already printed
         }
         info.size += macro_info.size;
-        for (var j = 0; j < macro_info.dump.length; j++) {
-          info.dump.push(macro_info.dump[j]);
-        }
+        info.expanded.push(macro_info);
       }
       return info;
     }
@@ -874,6 +875,7 @@ var Assembler = {
       info.dump[0] = ((offset + 0x21) << 10) | (info.b.code << 5) | opcode;
       return info;
     }
+
     if (info.data_expr) {
       for (var i = 0; i < info.data_expr.length; i++) {
         if (info.data_expr[i]) { // unresolved expression
@@ -883,6 +885,19 @@ var Assembler = {
         }
       }
     }
+
+    if (info.expanded) {
+      // macro expansion. resolve each line recursively.
+      for (var i = 0; i < info.expanded.length; i++) {
+        var new_info = this.resolveLine(info.expanded[i], labels, logger);
+        if (!new_info) return false;
+        for (var j = 0; j < new_info.dump.length; j++) {
+          info.dump.push(new_info.dump[j]);
+        }
+      }
+      return info;
+    }
+        
     if (info.a !== undefined) {
       if (info.a.expr !== undefined) {
         var a = this.resolveOperand(info.a, labels, logger);
