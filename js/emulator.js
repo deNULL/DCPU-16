@@ -303,7 +303,7 @@ step: function(memory, registers, state, hardware) {
           v = 0;
         } else {
           v = bv / av;
-          registers.EX = (res * 0x10000) & 0xffff;
+          registers.EX = (v * 0x10000) & 0xffff;
         }
         DCPU.cycles += 3;
         break;
