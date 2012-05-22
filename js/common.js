@@ -17,3 +17,18 @@ function wrapAs(s, c) {
 function ge(e) {
   return document.getElementById(e);
 }
+
+function computedHeight(e) {
+  return parseInt(getComputedStyle(e, "").getPropertyValue("height"));
+}
+
+function bodyMargin() {
+  var style = getComputedStyle(document.body, "")
+  return parseInt(style.getPropertyValue("margin-top")) +
+    parseInt(style.getPropertyValue("margin-bottom"));
+}
+
+// make "dest" element be the same height as "source"
+function matchHeight(dest, source) {
+  dest.style.height = computedHeight(source) + "px";
+}

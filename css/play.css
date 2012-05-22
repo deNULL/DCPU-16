@@ -1,0 +1,234 @@
+html {
+  height: 100%;
+  overflow-y: hidden;
+}
+body {
+  margin: 1em;
+  height: 100%;
+  overflow-y: hidden;
+}
+a {
+  text-decoration: none !important;
+}
+.mono {
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* override bootstrap */
+.row-fluid [class*="span"] {
+  min-height: 1px;
+}
+
+#header {
+  padding-bottom: 1em;
+}
+
+.main {
+  overflow-y: no-display;
+}
+
+.tabs {
+  margin-left: 0px !important;
+  padding: 0px 10px;
+  top: 4em;
+}
+.tab {
+  font-size: 12pt;
+  padding: 2px 7px;
+  border-radius: 4px 4px 0px 0px;
+  margin: 0px 1px;
+  min-height: 0px;  /* override bootstrap */
+}
+.tab_active {
+  background-color: #8AE;
+  color: white !important;
+  text-decoration: none;
+}
+.tab_inactive {
+  background-color: #eee;
+  color: #57C !important;
+}
+
+/* in order to make the left panel scroll, all enclosing divs must be 100% height */
+.noscroll {
+  height: 100%;
+  overflow-y: no-display;
+}
+.tab_content {
+  height: 100%;
+  overflow-y: scroll;
+  position: relative; /* so highlight line will work */  
+}
+#tab1_wrapper {
+  display: none;
+}
+#tab2_wrapper {
+  display: none;
+  overflow-y: scroll;
+  position: relative;
+}
+
+.linenums {
+  padding-left: 0px;
+  padding-top: 5px;
+  display: block;
+  text-align: right;
+  color: gray;
+}
+.pointer {
+  cursor: pointer;
+}
+.linenums .breakpoint {
+  background-color: #adf;
+  border: 1px solid #3ab;
+  border-radius: 3px;
+  padding-top: 0px;
+  padding-bottom: 0px;
+  padding-right: 4px;
+}
+.linenum {
+  margin-left: 1.0em !important;
+  display: block;
+  line-height: 18px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  padding-right: 5px;
+}
+.addr {
+  margin-left: 0px !important;
+}
+.dump {
+  margin-left: 1.0em !important;
+  padding-top: 6px;
+  white-space: nowrap;
+  text-align: left;
+  overflow-x: hidden;
+}
+
+#line_highlight {
+  background-color: #afa;
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 100%;
+  height: 20px;
+  z-index: -1000;
+}
+
+.editor_div {
+  margin-left: 0.5em !important;
+}
+.editor {
+  color: black;
+  width: 100%;
+  min-height: 20em;
+  background-color: transparent;
+}
+
+#md_view {
+  position: relative;
+  top: 0px;
+  left: 0px;
+  height: 8807px;
+}
+#md_lines {
+  position: relative;
+  top: 0px;
+}
+#md_dump {
+  position: relative;
+  top: 0px;
+  left: 0px;
+  border: solid 2px #ccc;
+  border-radius: 2px;
+  padding-top: 3px;
+  padding-left: 0.5em;
+}
+
+.screen_frame {
+  position: relative;
+}
+#screen {
+  background-color: black;
+  padding: 10px;
+}
+#loading_overlay {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  margin: 10px;
+}
+.notice {
+  marginx: 6px 0px 10px 0px;
+  color: gray;
+  font-size: 10pt;
+}
+
+.buttons {
+  margin-top: 1em;
+}
+.buttons button {
+  font-size: 14px;
+  font-weight: bold;
+  width: 100%;
+  text-align: left;
+  padding: 10px 10px;
+}
+
+.registers {
+  margin-top: 1em;
+}
+.registers table {
+  margin-top: 0.5em;
+}
+.registers td {
+  margin: 0px;
+  padding: 2px;
+}
+.registers td.reg_name {
+  padding-right: 5px;
+  padding-left: 25px;
+  font-weight: bold;
+  color: gray;
+}
+.cur_sp {
+  background-color: #aaaaff;
+  text-decoration: none;
+}
+.cur_pc {
+  background-color: #aaffaa;
+  text-decoration: none;
+}
+.registers td.cycles {
+  color: gray;
+  text-align: right;
+}
+
+#disassemble {
+  padding: 5px 10px;
+  margin-top: 1em;
+}
+
+#log_frame {
+  position: relative;
+}
+#log {
+  position: fixed;
+  left: 0px;
+  bottom: 0px;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 1em;
+  min-height: 4em;
+  border-top: solid 1px gray;
+  background-color: white;
+}
+#log .line {
+  color: gray;
+}
+#log .fatal {
+  font-weight: bold;
+  color: #900;
+}
