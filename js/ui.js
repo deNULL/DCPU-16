@@ -191,6 +191,9 @@ function pad(v, w) {
   return s;
 }
 
+function getText(e) {
+  return ge(e).innerText || ge(e).textContent;
+}
 function htmlEscape(s) {
   return s.split(" ").join("&nbsp;").split("<").join("&lt;");
 }
@@ -225,7 +228,7 @@ function assemble() {
       selEnd = -1;
     }
   }*/
-  var lines = ge("asm_code").innerText.split("\n");
+  var lines = getText("asm_code").split("\n");
   var emptyLine = false;
   if (lines.length > 0 && lines[lines.length - 1].length == 0) {
     emptyLine = true;
@@ -342,7 +345,7 @@ function assemble() {
 }
 
 function disassemble() {
-  var input = ge("dasm_dump").innerText;
+  var input = getText("dasm_dump");
   var linenum = input.split("\n").length;
   var data = [];
   var s = "";
@@ -448,7 +451,7 @@ function disassembleDump() {
     dump += pad((memory[i] || 0).toString(16), 4);
     dump += (i % 8 == 7) ? "\n" : " ";
   }
-  ge("dasm_dump").innerText = dump;
+  getText("dasm_dump") = dump;
   disassemble();
   toggleTab(1);
 }
@@ -483,20 +486,20 @@ Keyboard.init();
 disassemble();
 reset();
 updateSizes();
-var lastCode = ge("asm_code").innerText;
-var lastInput = ge("dasm_dump").innerText;
+var lastCode = getText("asm_code");
+var lastInput = getText("dasm_dump");
 
 setInterval(function() {
   Screen.blink = !Screen.blink;
   Screen.update(memory);
 
 
-  var code = ge("asm_code").innerText;
+  var code = getText("asm_code");
   if (code != lastCode) {
     lastCode = code;
     assemble();
   }
-  var input = ge("dasm_dump").innerText;
+  var input = getText("dasm_dump");
   if (input != lastInput) {
     lastInput = input;
     disassemble();
