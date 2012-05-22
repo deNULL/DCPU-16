@@ -1,136 +1,135 @@
-body, button {
-  font-family: Verdana, Tahoma, sans-serif;
-  font-size: 14px;
-}
-button.big {
-  font-size: 20px;
-  width: 160px;
-  height: 40px;
-  text-align: left;
-  margin: 4px;
-}
-.filewrap {
-  margin: 6px 6px 0px 0px;
-  position: relative;
-  display: inline-block;
-}
-.filewrap .file {
-  position: absolute;
-  opacity: 0;
-  -moz-opacity: 0;
-  filter:alpha(opacity=0);
+html, body, #layout, #asm_wrap, #dasm_wrap {
+  padding: 0;
   margin: 0;
-  width: 100%;
   height: 100%;
-  z-index: -100;
+  border: none;
 }
-
+body, button {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: #333;
+}
 h3 {
-  font-size: 22px;
-  margin-bottom: 0px;
+  margin: 0;
+  padding: 4px 0;
+  font-size: 18px;
+  height: 22px;
+  font-family: inherit;
+  font-weight: bold;
+  color: inherit;
+  text-rendering: optimizelegibility;
+}
+#header h3 {
+  overflow: hidden;
+  white-space: nowrap;
+}
+h4 {
+  margin: 14px 0px 7px 0px;
+  padding: 0 12px;
+  font-size: 15px;
 }
 table td {
   position: relative;
 }
+button {
+  font-size: 15px;
+  padding: 5px 10px;
+  margin: 6px 0 4px 2px;
+  background: #EAECEA;
+  color: #222 !important;
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+  border: solid 1px #aaa;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 1px rgba(0, 0, 0, 0.2);
+  -moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 1px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 1px rgba(0, 0, 0, 0.2);
+  -webkit-transition-duration: 0.2s;
+  -moz-transition-duration: 0.2s;
+  transition-duration: 0.2s;
+  -webkit-user-select:none;
+  -moz-user-select:none;
+  -ms-user-select:none;
+  user-select:none;
+  cursor: pointer;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  text-decoration: none;
+  text-align: left;
+}
+button.big {
+  width: 124px;
+  height: 35px;
+}
+button.green {
+  background: #afa;
+}
+button:hover {
+  background: #dddddd;
+  border: solid 1px #999;
+  text-decoration: none;
+}
+button.green:hover {
+  background: #beb;
+}
+button:active {
+  -webkit-box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);
+  -moz-box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);
+  background: #a9a9a9;
+  border: solid 1px #777;
+}
+button.green:active {
+  background: #6c6;
+}
+button:disabled:active, button:disabled {
+  background: #fAfCfA;
+  color: #aaa !important;
+  border: solid 1px #eee;
+}
 .editor, .editor td {
   font-family: Monaco, Lucida Console, Andale Mono, Courier New, Courier, monospace;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 19px;
   margin: 0;
 }
-#linenums {
-  padding: 2px 0px 2px 0px;
-  text-align: right;
-  color: gray;
+.tabs {
+  clear: left;
 }
-#linenums u {
-  margin: 1px 1px 2px 1px;
-  padding: 1px 11px;
-  line-height: 15px;
+.tab_active {
+  background-color: #8AE;
+  color: white;
+  padding: 2px 7px;
   text-decoration: none;
-  display: block;
-  cursor: pointer;
+  border-radius: 4px 4px 0px 0px;
+  margin: 0;
 }
-#linenums u.breakpoint {
-  padding: 0px 10px;
-  background-color: #adf;
-  border: 1px solid #3ab;
-  border-radius: 3px;
+.tab_inactive {
+  background-color: #FFF;
+  color: #57C;
+  padding: 2px 7px;
+  text-decoration: none;
+  border-radius: 4px 4px 0px 0px;
+  margin: 0;
 }
-#offsets {
-  padding: 4px 10px 2px 24px;
+.notice {
   color: gray;
+  font-size: 10pt;
+  font-weight: normal;
+  margin-left: 10px;
 }
-#da_lines {
-  padding: 4px 10px 2px 24px;
-  color: gray;
-}
-#code {
-  width: 100%;
-  min-width: 500px;
-  background-color: transparent;
-}
-#da_input {
-  width: 100%;
-  min-width: 200px;
-}
-#dump {
-  overflow-x: auto;
-  overflow-y: visible;
-  white-space: nowrap;
-  padding: 4px;
-  width: 300px;
-}
-#da_code {
-  padding: 4px;
-}
-#log {
-  padding-top: 6px;
-}
-#log .line {
-  color: gray;
-}
-#log .fatal {
-  font-weight: bold;
-  color: #900;
-}
-#memory_wrapper {
+.column {
   position: relative;
+  min-height: 100%;
 }
-#memory_window {
-  overflow-y: scroll;
-  width: 400px;
-  height: 304px;
-}
-#memory_stub {
-  height: 8480px;
-}
-#memory_view {
-  position: relative;
+.fl_l {
   float: left;
-  top: 0px;
-  left:0px;
 }
-#memory_lines {
-  position: relative;
-  float: left;
-  top: 0px;
-  left: 0px;
-  padding-right: 6px;
-  color: gray;
+.fl_r {
+  float: right;
 }
-.reg_name {
-  padding-left: 20px;
-  font-weight: bold;
-  color: gray;
-}
-.cur_sp {
-  background-color: #aaaaff;
-  text-decoration: none;
-}
-.cur_pc {
-  background-color: #aaffaa;
-  text-decoration: none;
+.clear {
+  clear: both;
 }
 .line_highlight {
   background-color: #aaffaa;
@@ -141,70 +140,201 @@ table td {
   height: 19px;
   z-index: -1000;
 }
-.hlight_wrap {
+#header {
+  height: 48px;
+  margin-left: 6px;
+}
+#tab0_content, #tab1_content {
+  border: 1px solid #CCC;
+  border-width: 1px 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  height: 100%;
+  max-height: 100%;
+}
+#tab1_content {
+  display: none;
+}
+#asm_lines_wrap, #dasm_lines_wrap {
+  z-index: 2000;
+  background-color: #eee;
+}
+#asm_lines, #dasm_lines {
+  width: 50px;
+  text-align: right;
+  color: gray;
+}
+#asm_lines u {
+  -moz-user-select: -moz-none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  margin: 0px 1px 2px 1px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  line-height: 15px;
+  text-decoration: none;
+  display: block;
+  cursor: pointer;
+}
+#asm_lines u.breakpoint {
+  background-color: #adf;
+  border: 1px solid #3ab;
+}
+#asm_offsets, #dasm_offsets {
+  width: 50px;
+  padding: 1px 10px 2px 24px;
+  color: gray;
+}
+#asm_code, #dasm_dump {
+  display: block;
+  border: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: hidden;
+  overflow-x: auto;
+  height: 100%;
+  min-height: 100%;
+  background-color: transparent;
+  resize: none;
+  cursor: text;
+  white-space: nowrap;
+  border: 1px solid #CCC;
+  border-width: 0px 1px 0px 1px;
+  -webkit-border-radius: 3px;
+     -moz-border-radius: 3px;
+          border-radius: 3px;
+  -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+     -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+          box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+}
+#asm_dump_wrap, #dasm_code_wrap {
+  z-index: 2000;
+}
+#dasm_code_wrap {
+  max-width: 35%;
+}
+#asm_dump, #dasm_code {
+  overflow-x: auto;
+  overflow-y: visible;
+  white-space: nowrap;
+  padding:1px;
+  width: 200px;
+}
+#dasm_code {
+  width: 600px;
+}
+
+#controls {
+  width: 392px;
+}
+#info_panel {
+  width: 392px;
+}
+
+#screen_wrapper {
   position: relative;
 }
 #screen {
   background-color: black;
   padding: 4px;
 }
-.notice {
-  margin: 6px 0px 10px 0px;
-  color: gray;
-  font-size: 14px;
-}
-.notice a {
-  color: black;
-}
-#tab1_wrapper {
-  display: none;
-}
-#da_code .op, #log .op {
-  font-weight: bold;
-  color: #700;
-}
-#da_code .reg, #log .reg {
-  font-weight: bold;
-  color: #070;
-}
-#da_code .lit, #log .lit {
-  color: #007;
-}
-#da_code .kw, #log .kw {
-  color: #077;
-}
-#da_code .lbl, #log .lbl {
-  color: #707;
-}
-.tabs {
-  margin-bottom: 2px;
-}
-.tab_active {
-  background-color: #8AE;
-  color: white;
-  padding: 2px 7px;
-  text-decoration: none;
-  border-radius: 4px 4px 0px 0px;
-  margin: 0px 5px;
-}
-.tab_inactive {
-  background-color: #FFF;
-  color: #57C;
-  padding: 2px 7px;
-  text-decoration: none;
-  border-radius: 4px 4px 0px 0px;
-  margin: 0px 5px;
-}
-#disassembleDump {
-  float: right;
-  margin-top: 19px;
-}
-#screen_wrapper {
-  position: relative;
-}
 #loading_overlay {
   position: absolute;
   top: 0px;
   left: 0px;
   margin: 4px;
+}
+
+#cycles_wrap {
+  width: 200px;
+  margin-top: 12px;
+}
+#cycles_wrap .reg_name {
+  padding-left: 12px;
+  width: 94px;
+}
+
+#registers {
+  width: 400px;
+}
+.reg_name {
+  width: 30px;
+  height: 25px;
+  padding-left: 20px;
+  font-weight: bold;
+  color: gray;
+}
+.reg_value {
+  width: 40px;
+  padding-left: 4px;
+}
+#regSP, #memSP {
+  background-color: #aaaaff;
+  text-decoration: none;
+}
+#regPC, #memPC {
+  background-color: #aaffaa;
+  text-decoration: none;
+}
+
+#memory_wrapper {
+  padding-left: 7px;
+  position: relative;
+  overflow-y: scroll;
+  width: 385px;
+  height: 304px;
+}
+#memory_content {
+  height: 8480px;
+}
+#memory_view {
+  position: relative;
+  top: 0px;
+  left:0px;
+}
+#memory_lines {
+  position: relative;
+  top: 0px;
+  left: 0px;
+  padding-right: 6px;
+  color: gray;
+}
+#disassemble_dump {
+  float: right;
+  margin: 12px 10px 0 0;
+  padding: 2px 10px;
+}
+
+#dasm_code .op, #log .op {
+  font-weight: bold;
+  color: #700;
+}
+#dasm_code .reg, #log .reg {
+  font-weight: bold;
+  color: #070;
+}
+#dasm_code .lit, #log .lit {
+  color: #007;
+}
+#dasm_code .kw, #log .kw {
+  color: #077;
+}
+#dasm_code .lbl, #log .lbl {
+  color: #707;
+}
+
+#log {
+  float: left;
+  padding-top: 6px;
+  height: 48px;
+}
+#log .line {
+  color: gray;
+}
+#log .fatal {
+  font-weight: bold;
+  color: #900;
 }

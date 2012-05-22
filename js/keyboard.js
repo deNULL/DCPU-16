@@ -96,7 +96,7 @@ var Keyboard = {
         return false;
       }
     }
-    return true;
+    return false;
   },
 
   onkeypress: function(event, queueInterrupt) {

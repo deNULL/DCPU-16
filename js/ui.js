@@ -23,6 +23,10 @@ document.onkeydown = function(event) {
       step();
       return false;
     }
+    case 27: {
+      reset();
+      return false;
+    }
     default: { // pass it to program
       if (!runningTimer) return true;
       return Keyboard.onkeydown(event, queueInterrupt);
@@ -44,7 +48,7 @@ document.onkeyup = function(event) {
 
 function toggleTab(index) {
   for (var i = 0; i < 2; i++) {
-    ge("tab" + i + "_wrapper").style.display = (index == i) ? "block" : "none";
+    ge("tab" + i + "_content").style.display = (index == i) ? "block" : "none";
     ge("tab" + i).className = (index == i) ? "tab_active" : "tab_inactive";
   }
 }
@@ -57,25 +61,28 @@ function updateRegisters() {
 function toggleShowPC() {
   updateHighlight();
 }
-updateRegisters();
+//updateRegisters();
 
+var MEMORY_ROW_SIZE = 8;
 function updateMemoryView() {
   var lns = "";
   var s = "";
-  var offs = ge("memory_window").scrollTop * 8;
-  ge("memory_lines").style.top = (offs / 8) + "px";
-  ge("memory_view").style.top = (offs / 8) + "px";
-  for (var i = 0; i < 16; i++) {
-    lns += pad((offs + i * 8).toString(16), 4) + ":<br/>";
-    for (var j = 0; j < 8; j++) {
-      var v = memory[offs + i * 8 + j];
+
+  var offs = ge("memory_wrapper").scrollTop * MEMORY_ROW_SIZE;
+  var vis_lines = ge("memory_wrapper").offsetHeight / 19;
+  ge("memory_lines").style.top = (offs / MEMORY_ROW_SIZE) + "px";
+  ge("memory_view").style.top = (offs / MEMORY_ROW_SIZE) + "px";
+  for (var i = 0; i < vis_lines; i++) {
+    lns += pad((offs + i * MEMORY_ROW_SIZE).toString(16), 4) + ":<br/>";
+    for (var j = 0; j < MEMORY_ROW_SIZE; j++) {
+      var v = memory[offs + i * MEMORY_ROW_SIZE + j];
       if (!v) v = 0;
       v = pad(v.toString(16), 4);
-      if (((offs + i * 8 + j + 1) & 0xffff) == registers.SP) {
-        s += " <u class='cur_sp'>" + v + "</u>";
+      if (registers.SP > 0 && ((offs + i * MEMORY_ROW_SIZE + j) & 0xffff) == registers.SP) {
+        s += " <u id='memSP'>" + v + "</u>";
       } else
-      if (offs + i * 8 + j == registers.PC) {
-        s += " <u class='cur_pc'>" + v + "</u>";
+      if (offs + i * MEMORY_ROW_SIZE + j == registers.PC) {
+        s += " <u id='memPC'>" + v + "</u>";
       } else {
         s += " " + v;
       }
@@ -85,25 +92,23 @@ function updateMemoryView() {
   ge("memory_lines").innerHTML = lns;
   ge("memory_view").innerHTML = s;
 }
-updateMemoryView();
+//updateMemoryView();
 function positionHighlight(line) {
-  if (!ge("show_pc").checked) {
+  /*if (!ge("show_pc").checked) {
     line = -1;
-  }
-  for (var i = 1; i <= 4; i++) {
-    var hlight = ge("hlight" + i);
-    if (line >= 0) {
-      hlight.style.top = line * 19 + 2;
-      hlight.style.display = "block";
-    } else {
-      hlight.style.display = "none";
-    }
+  }*/
+  var hlight = ge("asm_hlight");
+  if (line >= 0) {
+    hlight.style.top = line * 19;
+    hlight.style.display = "block";
+  } else {
+    hlight.style.display = "none";
   }
 }
 function updateHighlight() {
   positionHighlight(memToLine[registers.PC] - 1);
 }
-positionHighlight(-1);
+//positionHighlight(-1);
 function reset() {
   for (var reg in registers) {
     registers[reg] = 0;
@@ -186,15 +191,54 @@ function pad(v, w) {
   return s;
 }
 
+function htmlEscape(s) {
+  return s.split(" ").join("&nbsp;").split("<").join("&lt;");
+}
 function assemble() {
-  var lines = ge("code").value.split("\n");
+  var asm_code = ge("asm_code");
+  /*var selStart = -1;
+  var selEnd = -1;
+  if (window.getSelection().rangeCount > 0) {
+    var range = window.getSelection().getRangeAt(0);
+    selStart = range.startOffset;
+    var startContainer = range.startContainer;
+    var startAtLineStart = selStart == 0;
+    while (startContainer != asm_code && startContainer != null) {
+      while (startContainer.previousSibling != null) {
+        startContainer = startContainer.previousSibling;
+        selStart += startContainer.textContent.length;
+      }
+      startContainer = startContainer.parentNode;
+    }
+    selEnd = range.endOffset;
+    var endContainer = range.endContainer;
+    var endAtLineStart = selEnd == 0;
+    while (endContainer != asm_code && endContainer != null) {
+      while (endContainer.previousSibling != null) {
+        endContainer = endContainer.previousSibling;
+        selEnd += endContainer.textContent.length;
+      }
+      endContainer = endContainer.parentNode;
+    }
+    if (startContainer == null || endContainer == null) {
+      selStart = -1;
+      selEnd = -1;
+    }
+  }*/
+  var lines = ge("asm_code").innerText.split("\n");
+  var emptyLine = false;
+  if (lines.length > 0 && lines[lines.length - 1].length == 0) {
+    emptyLine = true;
+    lines.pop();
+  }
+
   var log = [];
 
   var linenums = [];
   for (var i = 0; i < lines.length; i++) {
     linenums.push("<u id=ln" + i + " onclick='bp(" + i + ")'>" + (i + 1) + "</u>");
   }
-  ge("linenums").innerHTML = linenums.join("");
+  ge("asm_lines").innerHTML = linenums.join("");
 
   var logger = function(line, address, pos, message, fatal) {
     log.push("<span class='line'>" + pad(line + 1, 5) + ":</span> " +
@@ -230,13 +274,63 @@ function assemble() {
         dump.push(s);
       }
     }
+
+    /*asm_code.innerHTML = rv.syntax.join("<br/>") + (emptyLine ? "<br/><span></span>" : "");
+    if (selStart > -1 && selEnd > -1) {
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      range = document.createRange();
+      startContainer = asm_code;
+      while (true) {
+        if (startContainer.childNodes.length > 0) {
+          startContainer = startContainer.childNodes[0];
+        } else
+        if (selStart < startContainer.textContent.length || (selStart == startContainer.textContent.length && !startAtLineStart) || (selStart == 0 && (startContainer == asm_code || (startContainer.parentNode == asm_code && startContainer.nextSibling == null)))) {
+          range.setStart(startContainer, selStart);
+          break;
+        } else
+        if (startContainer.nextSibling != null) {
+          selStart -= startContainer.textContent.length;
+          startContainer = startContainer.nextSibling;
+        } else {
+          selStart -= startContainer.textContent.length;
+          while (startContainer.parentNode.nextSibling == null) {
+            startContainer = startContainer.parentNode;
+          }
+          startContainer = startContainer.parentNode.nextSibling;
+        }
+      }
+      endContainer = asm_code;
+      while (true) {
+        if (endContainer.childNodes.length > 0) {
+          endContainer = endContainer.childNodes[0];
+        } else
+        if (selEnd < endContainer.textContent.length || (selEnd == endContainer.textContent.length && !endAtLineStart) || (selEnd == 0 && (endContainer == asm_code || (endContainer.parentNode == asm_code && endContainer.nextSibling == null)))) {
+          range.setEnd(endContainer, selEnd);
+          break;
+        } else
+        if (endContainer.nextSibling != null) {
+          selEnd -= endContainer.textContent.length;
+          endContainer = endContainer.nextSibling;
+        } else {
+          selEnd -= endContainer.textContent.length;
+          while (endContainer.parentNode.nextSibling == null) {
+            endContainer = endContainer.parentNode;
+          }
+          endContainer = endContainer.parentNode.nextSibling;
+        }
+      }
+      sel.addRange(range);
+    }*/
   }
 
   // update UI
-  ge("offsets").innerHTML = offsets.join("<br/>");
-  ge("dump").innerHTML = dump.join("<br/>");
+  ge("asm_offsets").innerHTML = offsets.join("<br/>");
+  ge("asm_dump").innerHTML = dump.join("<br/>");
   ge("log").innerHTML = log.join("<br/>");
-  ge("code").style.height = Math.max(560, ((lines.length + 1) * 19 + 9)) + "px";
+  //ge("asm_code").style.height = Math.max(560, (lines.length * 19 + 3)) + "px";
+  var asm_code = ge("asm_code");
+  asm_code.style.height = Math.max(560, (lines.length * 19 + 3)) + (asm_code.scrollWidth > asm_code.offsetWidth ? SCROLLER_SIZE : 0) + "px";
 
   for (var line in breaks) {
     if (breaks[line] && (lineToMem[line] === undefined)) {
@@ -248,7 +342,7 @@ function assemble() {
 }
 
 function disassemble() {
-  var input = ge("da_input").value;
+  var input = ge("dasm_dump").innerText;
   var linenum = input.split("\n").length;
   var data = [];
   var s = "";
@@ -340,10 +434,10 @@ function disassemble() {
   }
 
   // update UI
-  ge("da_lines").innerHTML = lines.join("<br/>");
-  ge("da_code").innerHTML = output.join("<br/>");
+  ge("dasm_lines").innerHTML = lines.join("<br/>");
+  ge("dasm_code").innerHTML = output.join("<br/>");
   ge("log").innerHTML = log.join("<br/>");
-  ge("da_input").style.height = Math.max(560, ((linenum + 1) * 19 + 9)) + "px";
+  ge("dasm_dump").style.height = Math.max(560, ((linenum + 1) * 19 + 9)) + "px";
 }
 
 function disassembleDump() {
@@ -354,29 +448,55 @@ function disassembleDump() {
     dump += pad((memory[i] || 0).toString(16), 4);
     dump += (i % 8 == 7) ? "\n" : " ";
   }
-  ge("da_input").value = dump;
+  ge("dasm_dump").innerText = dump;
   disassemble();
   toggleTab(1);
 }
 
+function updateSizes() {
+  var height = window.innerHeight;
+  if (height === undefined) {
+    if (document.documentElement) {
+      height = document.documentElement.clientHeight;
+    }
+    if (height === undefined && document.body) {
+      height = document.body.clientHeight;
+    }
+  }
+
+
+  ge("tab0_content").style.height = (height - 48*2 - 10) + "px";
+  ge("tab1_content").style.height = (height - 48*2 - 10) + "px";
+
+  var vis_lines = parseInt((height - ge("memory_wrapper").offsetTop - 4) / 19);
+  ge("memory_wrapper").style.height = vis_lines * 19 + "px";
+  ge("memory_content").style.height = ((65536 / MEMORY_ROW_SIZE) + vis_lines * 19 - vis_lines) + "px";
+  updateMemoryView();
+}
+
+var SCROLLER_SIZE = getScrollerWidth();
+
 Clock.reset(queueInterrupt);
 Screen.init();
 Keyboard.init();
+
 disassemble();
 reset();
-var lastCode = ge("code").value;
-var lastInput = ge("da_input").value;
+updateSizes();
+var lastCode = ge("asm_code").innerText;
+var lastInput = ge("dasm_dump").innerText;
 
 setInterval(function() {
   Screen.blink = !Screen.blink;
   Screen.update(memory);
 
-  var code = ge("code").value;
+
+  var code = ge("asm_code").innerText;
   if (code != lastCode) {
     lastCode = code;
     assemble();
   }
-  var input = ge("da_input").value;
+  var input = ge("dasm_dump").innerText;
   if (input != lastInput) {
     lastInput = input;
     disassemble();

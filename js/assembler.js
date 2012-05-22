@@ -71,7 +71,7 @@ var Assembler = {
                  "hwn", "hwq", "hwi",
                  "jmp", "brk", "ret", "bra", "dat", "org" ],
 
-  SPACE: { ' ': true, '\n': true, '\r': true, '\t': true }, // to replace charAt(pos).match(/\s/), using regexps is very slow
+  SPACE: { 32: true, 160: true, 13: true, 10: true, 9: true }, // to replace charAt(pos).match(/\s/), using regexps is very slow
 
   /*
    * parser state is passed around in a "state" object:
@@ -92,7 +92,7 @@ var Assembler = {
     var subst = state.subst;
     var logger = state.logger;
 
-    while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+    while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
     if (pos == end) {
       logger(pos, "Value expected (operand or expression)", true);
       return false;
@@ -105,7 +105,7 @@ var Assembler = {
       atom = this.parseExpression(state, 0);
       if (!atom) return false;
       pos = atom.state.pos;
-      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+      while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
       if (pos == end || text.charAt(pos) != ')') {
         logger(pos, "Missing ) on expression", true);
         return false;
@@ -168,7 +168,7 @@ var Assembler = {
     var end = state.end;
     var logger = state.logger;
 
-    while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+    while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
     if (pos == end) {
       logger(pos, "Expression expected", true);
       return false;
@@ -178,7 +178,7 @@ var Assembler = {
     pos = left.state.pos;
 
     while (true) {
-      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+      while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
       if (pos == end || text.charAt(pos) == ')') return left;
 
       var newprec = this.BINARY[text.charAt(pos)];
@@ -293,7 +293,7 @@ var Assembler = {
 
     // manually find position of expression, for displaying nice error messages.
     var pos = text.indexOf('=') + 1;
-    while (this.SPACE[text.charAt(pos)]) pos++;
+    while (this.SPACE[text.charCodeAt(pos)]) pos++;
     var state = { text: text, pos: pos, end: text.length, subst: subst, logger: logger };
     var expr = this.parseExpression(state, 0);
     if (expr) {
@@ -313,13 +313,16 @@ var Assembler = {
    *   - arg_ends (array): positions of the end of operands within the text
    */
   parseLine: function(text, macros, subst, logger) {
+    var ppos = 0;
     var pos = 0;
+    var pend = text.length;
     var end = text.length;
-    var line = { text: text, pos: pos, end: end, args: [] };
+    var line = { text: text, pos: pos, end: end, args: [], syntax: "", syntax_end: "" };
 
     // strip comments so we don't have to worry about them
     var in_string = false;
-    var in_char = false
+    var in_char = false;
+
     for (var i = 0; i < text.length; i++) {
       if (in_string && text.charAt(i) == '\\' && i < text.length - 1) {
         i++;
@@ -328,12 +331,16 @@ var Assembler = {
       } else if (text.charAt(i) == '\'' && !in_string) {
         in_char = !in_char;
       } else if (text.charAt(i) == ';' && !in_string && !in_char) {
+        line.syntax_end = wrapAs(text.substr(i), "comm");
         end = i;
         break;
       }
     }
 
-    while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+
+    while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+    line.syntax += text.substring(ppos, pos);
+    ppos = pos;
     if (pos >= end) return line;
 
     if (text.charAt(pos) == ":") {
@@ -346,9 +353,14 @@ var Assembler = {
       }
       line.label = line.label[0].toLowerCase();
       pos += line.label.length;
+
+      line.syntax += wrapAs(text.substr(ppos, pos), "lbl");
+      ppos = pos;
     }
 
-    while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+    while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+    line.syntax += text.substring(ppos, pos);
+    ppos = pos;
     if (pos >= end) return line;
 
     if (text.charAt(pos) == "#") {
@@ -362,7 +374,12 @@ var Assembler = {
       line.directive = line.directive[0].toLowerCase();
       pos += line.directive.length;
 
-      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+      line.syntax += wrapAs(text.substr(ppos, pos), "dir");
+      ppos = pos;
+
+      while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+      line.syntax += text.substring(ppos, pos);
+      ppos = pos;
       if (pos >= end) return line;
 
       if (line.directive == "macro") {
@@ -375,13 +392,18 @@ var Assembler = {
         line.macro = line.macro[0].toLowerCase();
         pos += line.macro.length;
 
-        while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
-        while (pos < end && this.SPACE[text.charAt(end - 1)]) end--;
+        line.syntax += wrapAs(text.substr(ppos, pos), "macro");
+        ppos = pos;
+
+        line.syntax += text.substr(pos, end) + wrapAs(comment, "comm");
+
+        while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+        while (pos < end && this.SPACE[text.charCodeAt(end - 1)]) end--;
         if (text.charAt(end - 1) == "{") {
           line.start_block = true;
           end--;
         }
-        while (pos < end && this.SPACE[text.charAt(end - 1)]) end--;
+        while (pos < end && this.SPACE[text.charCodeAt(end - 1)]) end--;
         if (text.charAt(pos) == "(" && text.charAt(end - 1) == ")") {
           pos++;
           end--;
@@ -405,7 +427,12 @@ var Assembler = {
         }
         line.define = line.define[0].toLowerCase();
         pos += line.define.length;
-        while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+        line.syntax += wrapAs(text.substr(ppos, pos), "def");
+        ppos = pos;
+
+        while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+        line.syntax += text.substring(ppos, pos);
+        ppos = pos;
         if (pos >= end) return line;
       }
     } else {
@@ -417,7 +444,9 @@ var Assembler = {
         line.end_block = true;
         pos++;
       }
-      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
+      while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+      line.syntax += text.substring(ppos, pos);
+      ppos = pos;
       if (pos >= end) return line;
 
       var word = text.substr(pos, end - pos).match(/^[^ (]+/);
@@ -428,8 +457,11 @@ var Assembler = {
       line.op = word[0].toLowerCase();
       pos += line.op.length;
 
-      while (pos < end && this.SPACE[text.charAt(pos)]) pos++;
-      while (pos < end && this.SPACE[text.charAt(end - 1)]) end--;
+      line.syntax += wrapAs(text.substring(ppos, pos), "op");
+      ppos = pos;
+
+      while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+      while (pos < end && this.SPACE[text.charCodeAt(end - 1)]) end--;
       if (subst[line.op] !== undefined) {
         line.op = subst[line.op];
       }
@@ -440,7 +472,19 @@ var Assembler = {
           end--;
         }
       }
+
+      line.syntax += text.substring(ppos, pos);
+      ppos = pos;
+      line.syntax_end = text.substring(end, pend) + line.syntax_end;
+      pend = end;
     }
+
+    while (pos < end && this.SPACE[text.charCodeAt(pos)]) pos++;
+    while (pos < end && this.SPACE[text.charCodeAt(end - 1)]) end--;
+    line.syntax += text.substring(ppos, pos);
+    ppos = pos;
+    line.syntax_end = text.substring(end, pend) + line.syntax_end;
+    pend = end;
 
     var args = [ "" ];
     var arg_locs = [ -1 ];
@@ -449,29 +493,36 @@ var Assembler = {
     in_string = false;
     in_char = false;
     for (var i = pos; i < end; i++) {
-      if (text.charAt(i) == '\\' && i + 1 < end) {
+      var ch = text.charAt(i);
+      if (!in_string && !in_char && (this.SPACE[text.charCodeAt(i)] || ch == ',' || ch == '(' || ch == ')' || ch == '[' || ch == ']' || ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%')) {
+        line.syntax += text.substring(ppos, pos);
+        ppos = pos;
+      }
+
+      if (ch == '\\' && i + 1 < end) {
         if (arg_locs[n] == -1) arg_locs[n] = i;
-        args[n] += text.charAt(i);
-      } else if (text.charAt(i) == '"') {
+        args[n] += ch;
+      } else if (ch == '"' && !in_char) {
         in_string = !in_string;
-        args[n] += text.charAt(i);
-      } else if (text.charAt(i) == "\'" && !in_string) {
+        args[n] += ch;
+      } else if (ch == "\'" && !in_string) {
         in_char = !in_char;
-        args[n] += text.charAt(i);
+        args[n] += ch;
         if (arg_locs[n] == -1) arg_locs[n] = i;
-      } else if (text.charAt(i) == ',' && !in_string && !in_char) {
+      } else if (ch == ',' && !in_string && !in_char) {
         arg_ends[n] = i;
         args.push("");
         arg_locs.push(-1);
         arg_ends.push(-1);
         n += 1;
-      } else if (text.charAt(i) == ';' && !in_string && !in_char) {
+      } else if (ch == ';' && !in_string && !in_char) {
         break;
-      } else if (in_string || in_char || text.charAt(i) != ' ') {
+      } else if (in_string || in_char || !this.SPACE[text.charCodeAt(i)]) {
         if (arg_locs[n] == -1) arg_locs[n] = i;
-        args[n] += text.charAt(i);
+        args[n] += ch;
       }
     }
+    line.syntax += text.substring(ppos, end);
     if (args[n] == "") {
       args.pop();
       arg_locs.pop();
@@ -486,6 +537,7 @@ var Assembler = {
     line.args = args;
     line.arg_locs = arg_locs;
     line.arg_ends = arg_ends;
+    line.syntax += line.syntax_end;
     return line;
   },
 
@@ -597,7 +649,7 @@ var Assembler = {
     if (end - pos >= 4 && state.text.substr(pos, 4).toLowerCase() == "pick") {
       pick = true;
       state.pos += 4;
-      while (state.pos < state.end && this.SPACE[state.text.charAt(state.pos)]) state.pos++;
+      while (state.pos < state.end && this.SPACE[state.text.charCodeAt(state.pos)]) state.pos++;
     }
 
     var expr = this.parseExpression(state);
@@ -709,7 +761,7 @@ var Assembler = {
   compileLine: function(text, org, labels, macros, subst, logger) {
     var line = this.parseLine(text, macros, subst, logger);
     if (!line) return false;
-    var info = { op: line.op, size: 0, dump: [] };
+    var info = { op: line.op, size: 0, dump: [], syntax: line.syntax };
 
     if (macros[" "]) {
       if (line.end_block) {
@@ -918,6 +970,7 @@ var Assembler = {
     var pc = 0;
     var infos = [ ];
     var macros = { };
+    var syntax = [ ];
 
     for (var i = 0; i < lines.length && !aborted; i++) {
       var l_logger = function(pos, text, fatal) {
@@ -927,7 +980,11 @@ var Assembler = {
       labels["."] = pc;
       if (!this.parseConstant(lines[i], labels, { }, l_logger)) {
         var info = this.compileLine(lines[i], pc, labels, macros, { }, l_logger);
-        if (!info) break;
+        if (!info) {
+          syntax.push(lines[i]);
+          break;
+        }
+        syntax.push(info.syntax);
         if (pc + info.size > 0xffff) {
           l_logger(0, "Code is too big (exceeds 128 KB) &mdash; not enough memory", true);
           break;
@@ -960,6 +1017,6 @@ var Assembler = {
     }
     if (aborted) return false;
 
-    return { infos: infos };
+    return { infos: infos, syntax: syntax };
   },
 }
