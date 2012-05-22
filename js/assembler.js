@@ -384,7 +384,7 @@ var Assembler = {
 
       if (line.directive == "macro") {
         // #macro directive
-        line.macro = text.substr(pos, end - pos).match(/^[^ (]*/);
+        line.macro = text.substr(pos, end - pos).match(/^[^\s(]*/);
         if (!line.macro || line.macro[0].length == 0 || this.OP_RESERVED.indexOf(line.macro[0].toLowerCase()) > -1) {
           logger(pos, "Invalid macro name: " + line.macro[0], true);
           return false;
@@ -449,7 +449,7 @@ var Assembler = {
       ppos = pos;
       if (pos >= end) return line;
 
-      var word = text.substr(pos, end - pos).match(/^[^ (]+/);
+      var word = text.substr(pos, end - pos).match(/^[^\s(]+/);
       if (!word) {
         logger(pos, "Inscrutable opcode", true);
         return false;
@@ -949,7 +949,7 @@ var Assembler = {
       }
       return info;
     }
-        
+
     if (info.a !== undefined) {
       if (info.a.expr !== undefined) {
         var a = this.resolveOperand(info.a, labels, logger);

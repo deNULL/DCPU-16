@@ -118,7 +118,9 @@ $code = $default_code;
 if (isset($_REQUEST['code'])) {
   $code = $_REQUEST['code'];
 }
-echo htmlspecialchars($code);?></div>
+$code = htmlspecialchars($code);
+$code = str_replace(array(" ", "\n"), array("&nbsp;", "<br/>"), $code);
+echo $code;?></div>
     </div>
   </div>
   <div id="tab1_content">
