@@ -192,7 +192,7 @@ function pad(v, w) {
 }
 
 function getText(e) {
-  return ge(e).innerText || ge(e).textContent;
+  return ge(e).innerHTML.replace(/\n/g, "").replace(/<(?:br|\/div|\/p)>/g, "\n").replace(/<.*?>/g, "").replace(/&nbsp;/g, " ");
 }
 function htmlEscape(s) {
   return s.split(" ").join("&nbsp;").split("<").join("&lt;");
@@ -449,9 +449,9 @@ function disassembleDump() {
   while (!memory[end] && end > 0) end--;
   for (var i = 0; i <= end + 1; i++) {
     dump += pad((memory[i] || 0).toString(16), 4);
-    dump += (i % 8 == 7) ? "\n" : " ";
+    dump += (i % 8 == 7) ? "<br/>" : " ";
   }
-  getText("dasm_dump") = dump;
+  ge("dasm_dump").innerHTML = dump;
   disassemble();
   toggleTab(1);
 }
@@ -466,7 +466,6 @@ function updateSizes() {
       height = document.body.clientHeight;
     }
   }
-
 
   ge("tab0_content").style.height = (height - 48*2 - 10) + "px";
   ge("tab1_content").style.height = (height - 48*2 - 10) + "px";
