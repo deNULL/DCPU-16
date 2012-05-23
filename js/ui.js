@@ -192,7 +192,7 @@ function pad(v, w) {
 }
 
 function getText(e) {
-  return ge(e).innerHTML.replace(/\n/g, "").replace(/<(?:br|\/div|\/p)>/g, "\n").replace(/<.*?>/g, "").replace(/&nbsp;/g, " ");
+  return ge(e).innerHTML.replace(/\n/g, "").replace(/(?:<\/div><div>|<\/p><p>|<\/div>|(?!^)<div>|(?!^)<p>)/g, "\n").replace(/<.*?>/g, "").replace(/&nbsp;/g, " ");
 }
 function htmlEscape(s) {
   return s.split(" ").join("&nbsp;").split("<").join("&lt;");

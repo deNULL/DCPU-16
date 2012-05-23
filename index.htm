@@ -119,7 +119,8 @@ if (isset($_REQUEST['code'])) {
   $code = $_REQUEST['code'];
 }
 $code = htmlspecialchars($code);
-$code = str_replace(array(" ", "\n"), array("&nbsp;", "<br/>"), $code);
+$code = "<div>".str_replace(array(" ", "\n"), array("&nbsp;", "</div><div>"), $code)."</div>";
+$code = str_replace("<div></div>", "<div><br/></div>", $code);
 echo $code;?></div>
     </div>
   </div>
