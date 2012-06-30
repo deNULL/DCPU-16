@@ -95,17 +95,16 @@ var Disassembler = {
     if (offset >= memory.length) return false;
     var word = memory[offset++];
     var op = { opcode: (word & 0x1f), a: (word >> 10 & 0x3f), b: (word >> 5 & 0x1f) };
-    if (this.hasArg(op.b)) {
-      if (offset >= memory.length) return false;
-      op.b_immediate = memory[offset++];
-    }
     if (this.hasArg(op.a)) {
       if (offset >= memory.length) return false;
       op.a_immediate = memory[offset++];
     }
+    if (op.opcode != 0 && this.hasArg(op.b)) {
+      if (offset >= memory.length) return false;
+      op.b_immediate = memory[offset++];
+    }
     // go ahead and decode embedded immediates.
     if (op.a >= 0x20) op.a_immediate = (op.a == 0x20 ? 0xffff : (op.a - 0x21));
-    if (op.b >= 0x20) op.b_immediate = (op.b == 0x20 ? 0xffff : (op.b - 0x21));
     op.size = offset - start;
     return op;
   },
@@ -130,7 +129,6 @@ var Disassembler = {
     res.size = op.size;
 
     var va = this.decodeValue(true, op.a, op.a_immediate, labels, wrapAs);
-    var vb = this.decodeValue(false, op.b, op.b_immediate, labels, wrapAs);
 
     // BRA pseudo-opcode is very convinient, but we want disassembled code to as compatible as possible
 
@@ -167,6 +165,8 @@ var Disassembler = {
         }
       }
     } else {
+      var vb = this.decodeValue(false, op.b, op.b_immediate, labels, wrapAs);
+
       var code = this.OP_BINARY[op.opcode];
       if (code === undefined) {
         logger(offset, "Unknown basic instruction: " + op.opcode.toString(16));
